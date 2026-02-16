@@ -1,0 +1,7 @@
+{
+  "name": "چرتکه من",
+  "description": "آموزش محاسبات ذهنی با چرتکه",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
