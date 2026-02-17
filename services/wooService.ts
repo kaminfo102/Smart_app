@@ -4,6 +4,11 @@ import { Product, Category, Order, CreateOrderPayload, Post } from '../types';
 
 const STORAGE_KEY = 'woo_config';
 
+// --- Cache Configuration ---
+const CACHE_TTL = 5 * 60 * 1000; // 5 Minutes Cache Time
+const cache = new Map<string, { data: any; expiry: number }>();
+const pendingRequests = new Map<string, Promise<any>>();
+
 interface WooConfig {
   url: string;
   key: string;
@@ -27,296 +32,242 @@ export const getWooConfig = (): WooConfig => {
 
 export const saveWooConfig = (url: string, key: string, secret: string) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ url, key, secret }));
+  cache.clear(); // Clear cache on config change
 };
 
-const getHeaders = (config: WooConfig) => {
-    const auth = btoa(`${config.key}:${config.secret}`);
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${auth}`
-    };
+// --- Advanced Fetch Wrapper ---
+interface RequestOptions extends RequestInit {
+  skipCache?: boolean;
+  params?: Record<string, string>;
+  isWpApi?: boolean; // Toggle between WC and WP API
+}
+
+const request = async <T>(endpoint: string, options: RequestOptions = {}): Promise<T> => {
+  const config = getWooConfig();
+  const baseUrl = config.url.replace(/\/$/, '');
+  const apiPath = options.isWpApi ? '/wp-json/wp/v2' : '/wp-json/wc/v3';
+  
+  // Construct URL with Params
+  const urlObj = new URL(`${baseUrl}${apiPath}${endpoint}`);
+  if (options.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      if (value) urlObj.searchParams.append(key, value);
+    });
+  }
+
+  // Generate Cache Key (URL + Params)
+  const cacheKey = urlObj.toString();
+
+  // 1. Check Cache (GET requests only)
+  if (!options.skipCache && (!options.method || options.method === 'GET')) {
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) {
+      // console.log('🚀 Serving from Cache:', endpoint);
+      return cached.data;
+    }
+  }
+
+  // 2. Request Deduplication (Prevent double fetching same resource)
+  if (!options.skipCache && (!options.method || options.method === 'GET')) {
+    if (pendingRequests.has(cacheKey)) {
+      return pendingRequests.get(cacheKey);
+    }
+  }
+
+  // Auth Headers
+  const auth = btoa(`${config.key}:${config.secret}`);
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Basic ${auth}`,
+    ...options.headers,
+  };
+
+  // Create Promise
+  const requestPromise = (async () => {
+    try {
+      // Add Timeout functionality (Professional Touch)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+      const response = await fetch(urlObj.toString(), {
+        ...options,
+        headers,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle Retry for 401 (Fallback to query params auth)
+      if (!response.ok && response.status === 401) {
+        urlObj.searchParams.append('consumer_key', config.key);
+        urlObj.searchParams.append('consumer_secret', config.secret);
+        const retryResponse = await fetch(urlObj.toString(), {
+            ...options,
+            headers: { ...options.headers, 'Content-Type': 'application/json' } // Remove Basic Auth header
+        });
+        if (!retryResponse.ok) throw new Error(`API Error: ${retryResponse.status}`);
+        const data = await retryResponse.json();
+        
+        // Cache result
+        if (!options.skipCache && (!options.method || options.method === 'GET')) {
+           cache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL });
+        }
+        return data;
+      }
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Cache result
+      if (!options.skipCache && (!options.method || options.method === 'GET')) {
+        cache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL });
+      }
+
+      return data;
+    } catch (error: any) {
+       console.error(`Fetch Error [${endpoint}]:`, error);
+       throw error;
+    } finally {
+      pendingRequests.delete(cacheKey);
+    }
+  })();
+
+  if (!options.skipCache && (!options.method || options.method === 'GET')) {
+    pendingRequests.set(cacheKey, requestPromise);
+  }
+
+  return requestPromise;
 };
+
+// --- Service Methods ---
 
 export const wooService = {
-  getProducts: async (params: { category?: number; search?: string; min_price?: string; max_price?: string; orderby?: string; order?: string; tag?: number } = {}): Promise<Product[]> => {
-    const config = getWooConfig();
-    try {
-      const baseUrl = config.url.replace(/\/$/, '');
-      const queryParams = new URLSearchParams({ per_page: '50' });
-      if (params.category) queryParams.append('category', params.category.toString());
-      if (params.tag) queryParams.append('tag', params.tag.toString());
-      if (params.search) queryParams.append('search', params.search);
-      if (params.min_price) queryParams.append('min_price', params.min_price);
-      if (params.max_price) queryParams.append('max_price', params.max_price);
-      if (params.orderby) queryParams.append('orderby', params.orderby);
-      if (params.order) queryParams.append('order', params.order);
+  getProducts: async (params: { category?: number; search?: string; min_price?: string; max_price?: string; orderby?: string; order?: string; tag?: number; per_page?: number } = {}): Promise<Product[]> => {
+    const queryParams: Record<string, string> = {
+        per_page: (params.per_page || 50).toString(),
+        ...(params.category && { category: params.category.toString() }),
+        ...(params.tag && { tag: params.tag.toString() }),
+        ...(params.search && { search: params.search }),
+        ...(params.min_price && { min_price: params.min_price }),
+        ...(params.max_price && { max_price: params.max_price }),
+        ...(params.orderby && { orderby: params.orderby }),
+        ...(params.order && { order: params.order }),
+    };
 
-      const queryString = queryParams.toString();
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products?${queryString}`, {
-          headers: getHeaders(config)
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-            const fallbackQuery = new URLSearchParams(queryParams);
-            fallbackQuery.append('consumer_key', config.key);
-            fallbackQuery.append('consumer_secret', config.secret);
-            const retryResponse = await fetch(`${baseUrl}/wp-json/wc/v3/products?${fallbackQuery.toString()}`);
-            if (!retryResponse.ok) throw new Error(`HTTP Error: ${retryResponse.status}`);
-            return await retryResponse.json();
-        }
-        throw new Error(`HTTP Error: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      throw error; 
-    }
+    return request<Product[]>('/products', { params: queryParams });
   },
 
   getProduct: async (id: number): Promise<Product> => {
-    const config = getWooConfig();
-    try {
-        const baseUrl = config.url.replace(/\/$/, '');
-        const response = await fetch(`${baseUrl}/wp-json/wc/v3/products/${id}`, { headers: getHeaders(config) });
-        if (!response.ok) {
-             if (response.status === 401) {
-                 const retry = await fetch(`${baseUrl}/wp-json/wc/v3/products/${id}?consumer_key=${config.key}&consumer_secret=${config.secret}`);
-                 if (!retry.ok) throw new Error('Product not found');
-                 return await retry.json();
-             }
-             throw new Error('Product not found');
-        }
-        return await response.json();
-    } catch (e) {
-        console.error("Error fetching product:", e);
-        throw e;
-    }
+    return request<Product>(`/products/${id}`);
   },
 
-  // --- Product Management (Create/Update/Delete) ---
-
   createProduct: async (data: any): Promise<Product> => {
-      const config = getWooConfig();
-      const baseUrl = config.url.replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products`, {
-          method: 'POST',
-          headers: getHeaders(config),
-          body: JSON.stringify(data)
-      });
-
-      if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.message || 'Error creating product');
-      }
-      return await response.json();
+      return request<Product>('/products', { method: 'POST', body: JSON.stringify(data), skipCache: true });
   },
 
   updateProduct: async (id: number, data: any): Promise<Product> => {
-      const config = getWooConfig();
-      const baseUrl = config.url.replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products/${id}`, {
-          method: 'PUT',
-          headers: getHeaders(config),
-          body: JSON.stringify(data)
-      });
-
-      if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.message || 'Error updating product');
-      }
-      return await response.json();
+      // Invalidate specific product cache and products list potentially
+      cache.delete(`${getWooConfig().url}/wp-json/wc/v3/products/${id}`); 
+      // Note: Invalidating list caches is harder without regex, typically we just let them expire or use a state manager.
+      
+      return request<Product>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data), skipCache: true });
   },
 
   deleteProduct: async (id: number): Promise<void> => {
-      const config = getWooConfig();
-      const baseUrl = config.url.replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products/${id}?force=true`, {
-          method: 'DELETE',
-          headers: getHeaders(config)
-      });
-
-      if (!response.ok) {
-          throw new Error('Error deleting product');
-      }
+      return request<void>(`/products/${id}`, { method: 'DELETE', params: { force: 'true' }, skipCache: true });
   },
-
-  // --- Categories & Others ---
 
   getCategories: async (): Promise<Category[]> => {
-    const config = getWooConfig();
-    try {
-      const baseUrl = config.url.replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products/categories?per_page=20&hide_empty=true`, { headers: getHeaders(config) });
-      if (!response.ok) {
-        if (response.status === 401) {
-            const retryResponse = await fetch(`${baseUrl}/wp-json/wc/v3/products/categories?consumer_key=${config.key}&consumer_secret=${config.secret}&per_page=20&hide_empty=true`);
-            if (!retryResponse.ok) throw new Error(`HTTP Error: ${retryResponse.status}`);
-            return await retryResponse.json();
-        }
-        throw new Error(`HTTP Error: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      throw error;
-    }
+    return request<Category[]>('/products/categories', { 
+        params: { per_page: '20', hide_empty: 'true' } 
+    });
   },
 
+  // Note: Posts often need external proxy if CORS is an issue on WP API.
+  // We keep the proxy logic but wrap it nicely.
   getPosts: async (page: number = 1, per_page: number = 3): Promise<Post[]> => {
     const config = getWooConfig();
+    const baseUrl = config.url.replace(/\/$/, '');
+    const endpoint = `${baseUrl}/wp-json/wp/v2/posts?per_page=${per_page}&page=${page}&_embed`;
+    const cacheKey = `posts_${page}_${per_page}`;
+
+    // Check Cache
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) return cached.data;
+
     try {
-      const baseUrl = config.url.replace(/\/$/, '');
-      const endpoint = `${baseUrl}/wp-json/wp/v2/posts?per_page=${per_page}&page=${page}&_embed`;
-      try {
+        // Try Direct
         const response = await fetch(endpoint);
-        if (response.ok) return await response.json();
-      } catch (err) { console.warn("Direct post fetch failed."); }
+        if (response.ok) {
+            const data = await response.json();
+            cache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL });
+            return data;
+        }
+    } catch (err) { /* Fallback */ }
 
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(endpoint)}`;
-      const proxyResponse = await fetch(proxyUrl);
-      if (proxyResponse.ok) return await proxyResponse.json();
-
-      return [];
+    // Fallback Proxy
+    try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(endpoint)}`;
+        const proxyResponse = await fetch(proxyUrl);
+        if (proxyResponse.ok) {
+             const data = await proxyResponse.json();
+             cache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL });
+             return data;
+        }
     } catch (e) { return []; }
+    return [];
   },
 
   getOrders: async (params: { customer?: number, per_page?: number, page?: number, status?: string } = {}): Promise<Order[]> => {
-    const config = getWooConfig();
-    try {
-        const baseUrl = config.url.replace(/\/$/, '');
-        let url = `${baseUrl}/wp-json/wc/v3/orders?per_page=${params.per_page || 20}`;
-        if (params.page) url += `&page=${params.page}`;
-        if (params.customer) url += `&customer=${params.customer}`;
-        if (params.status) url += `&status=${params.status}`;
+    const queryParams: Record<string, string> = {
+        per_page: (params.per_page || 20).toString(),
+        ...(params.page && { page: params.page.toString() }),
+        ...(params.customer && { customer: params.customer.toString() }),
+        ...(params.status && { status: params.status }),
+    };
 
-        const response = await fetch(url, { headers: getHeaders(config) });
-        if (!response.ok) {
-             if (response.status === 401) {
-                 let retryUrl = `${baseUrl}/wp-json/wc/v3/orders?consumer_key=${config.key}&consumer_secret=${config.secret}&per_page=${params.per_page || 20}`;
-                 if (params.page) retryUrl += `&page=${params.page}`;
-                 if (params.customer) retryUrl += `&customer=${params.customer}`;
-                 if (params.status) retryUrl += `&status=${params.status}`;
-                 
-                 const retry = await fetch(retryUrl);
-                 if (!retry.ok) throw new Error('Error fetching orders');
-                 return await retry.json();
-             }
-             throw new Error('Error fetching orders');
-        }
-        return await response.json();
-    } catch (e) {
-        console.error("Failed to fetch orders", e);
-        throw e;
-    }
+    // Important: Orders should usually NOT be cached long-term or skipCache should be true if we need realtime.
+    // We'll allow short caching but maybe we want to skip it for admin panels often.
+    // For now, let's cache but with the understanding that 'createOrder' should ideally invalidate.
+    return request<Order[]>('/orders', { params: queryParams, skipCache: true }); 
   },
 
-  getOrder: async (id: number): Promise<Order | null> => {
-      const config = getWooConfig();
-      try {
-          const baseUrl = config.url.replace(/\/$/, '');
-          const response = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${id}`, { headers: getHeaders(config) });
-          if (!response.ok) {
-              if (response.status === 401) {
-                  const retry = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${id}?consumer_key=${config.key}&consumer_secret=${config.secret}`);
-                  if (!retry.ok) throw new Error('Order not found');
-                  return await retry.json();
-              }
-              throw new Error('Order not found');
-          }
-          return await response.json();
-      } catch (e) { throw e; }
+  getOrder: async (id: number): Promise<Order> => {
+      return request<Order>(`/orders/${id}`, { skipCache: true });
   },
 
   createOrder: async (orderData: CreateOrderPayload): Promise<Order> => {
-      const config = getWooConfig();
-      const baseUrl = config.url.replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/orders`, {
-          method: 'POST',
-          headers: getHeaders(config),
-          body: JSON.stringify(orderData)
+      return request<Order>('/orders', { 
+          method: 'POST', 
+          body: JSON.stringify(orderData), 
+          skipCache: true 
       });
-
-      if (!response.ok) {
-           if (response.status === 401) {
-               const retry = await fetch(`${baseUrl}/wp-json/wc/v3/orders?consumer_key=${config.key}&consumer_secret=${config.secret}`, {
-                   method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify(orderData)
-               });
-               if (!retry.ok) {
-                   const err = await retry.json();
-                   throw new Error(err.message || 'خطا در ثبت سفارش');
-               }
-               return await retry.json();
-           }
-          const err = await response.json();
-          throw new Error(err.message || 'خطا در ثبت سفارش');
-      }
-      return await response.json();
   },
 
   updateOrder: async (orderId: number, status: string): Promise<void> => {
-    const config = getWooConfig();
-    const baseUrl = config.url.replace(/\/$/, '');
-    const response = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}`, {
+    return request<void>(`/orders/${orderId}`, {
         method: 'PUT',
-        headers: getHeaders(config),
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status }),
+        skipCache: true
     });
-    
-    if (!response.ok) {
-        if (response.status === 401) {
-            const retry = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}?consumer_key=${config.key}&consumer_secret=${config.secret}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
-            if (!retry.ok) throw new Error('Failed to update order');
-            return;
-        }
-        throw new Error('Failed to update order');
-    }
   },
 
   createOrderNote: async (orderId: number, note: string): Promise<void> => {
-      const config = getWooConfig();
-      const baseUrl = config.url.replace(/\/$/, '');
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}/notes`, {
+      return request<void>(`/orders/${orderId}/notes`, {
           method: 'POST',
-          headers: getHeaders(config),
-          body: JSON.stringify({ note })
+          body: JSON.stringify({ note }),
+          skipCache: true
       });
-      
-      if (!response.ok) {
-           if (response.status === 401) {
-               const retry = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}/notes?consumer_key=${config.key}&consumer_secret=${config.secret}`, {
-                   method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify({ note })
-               });
-               if (!retry.ok) throw new Error('Failed to add order note');
-               return;
-           }
-           throw new Error('Failed to add order note');
-      }
   },
 
   deleteOrder: async (orderId: number): Promise<void> => {
-    const config = getWooConfig();
-    const baseUrl = config.url.replace(/\/$/, '');
-    const response = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}?force=true`, {
+    return request<void>(`/orders/${orderId}`, {
         method: 'DELETE',
-        headers: getHeaders(config)
+        params: { force: 'true' },
+        skipCache: true
     });
-
-    if (!response.ok) {
-        if (response.status === 401) {
-             const retry = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}?consumer_key=${config.key}&consumer_secret=${config.secret}&force=true`, { method: 'DELETE' });
-            if (!retry.ok) throw new Error('Failed to delete order');
-            return;
-        }
-        throw new Error('Failed to delete order');
-    }
   }
 };
