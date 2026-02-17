@@ -5,10 +5,10 @@ import { Link } from 'react-router-dom';
 
 const FeaturesGrid: React.FC = () => {
   return (
-    <section className="bg-white dark:bg-gray-900 py-4 mb-2 rounded-2xl md:rounded-3xl">
+    <section className="bg-white dark:bg-gray-900 py-6 mb-2 m-3 overflow-hidden rounded-2xl md:rounded-3xl px-3 md:px-4 ">
         <div className="container mx-auto px-4">
             {/* App-like Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
                 <h2 className="text-sm md:text-lg font-bold text-gray-800 dark:text-white">خدمات ما</h2>
                 <Link to="/training" className="text-xs text-primary-600 flex items-center gap-1 font-bold">
                     مشاهده همه

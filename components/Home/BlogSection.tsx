@@ -82,7 +82,7 @@ const BlogSection: React.FC = () => {
   }, [posts]);
 
   return (
-    <section className="bg-white dark:bg-gray-900 py-4 mb-2 rounded-2xl md:rounded-3xl shadow-md">
+    <section className=" bg-white dark:bg-gray-900 py-4 mb-2 m-3 overflow-hidden rounded-2xl md:rounded-3xl shadow-md">
         <div className="container mx-auto px-0">
             {/* Header */}
             <div className="flex items-center justify-between mb-4 px-4">

@@ -4,7 +4,7 @@ import { Phone, ArrowLeft } from 'lucide-react';
 
 const ContactSection: React.FC = () => {
   return (
-    <section className="bg-white dark:bg-gray-900 py-4 mb-10 rounded-2xl md:rounded-3xl">
+    <section className="bg-white dark:bg-gray-900 py-4 mb-2 m-3 rounded-2xl md:rounded-3xl">
         <div className="container mx-auto px-4">
              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm md:text-lg font-bold text-gray-800 dark:text-white">پشتیبانی</h2>
