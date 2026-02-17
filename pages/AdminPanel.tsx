@@ -10,11 +10,12 @@ import AdminUsers from '../components/Admin/AdminUsers';
 import AdminOrders from '../components/Admin/AdminOrders';
 import AdminLMS from '../components/Admin/AdminLMS';
 import AdminHelp from '../components/Admin/AdminHelp';
+import AdminHero from '../components/Admin/AdminHero';
 
 const AdminPanel: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'orders' | 'lms' | 'help'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'help'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -58,6 +59,7 @@ const AdminPanel: React.FC = () => {
                   {activeTab === 'users' && <AdminUsers currentUser={user} />}
                   {activeTab === 'orders' && <AdminOrders />}
                   {activeTab === 'lms' && <AdminLMS />}
+                  {activeTab === 'hero' && <AdminHero />}
                   {activeTab === 'help' && <AdminHelp />}
               </div>
           </main>

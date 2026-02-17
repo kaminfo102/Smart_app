@@ -4,7 +4,7 @@ import { Phone, ArrowLeft } from 'lucide-react';
 
 const ContactSection: React.FC = () => {
   return (
-    <section className="bg-white dark:bg-gray-900 py-4 mb-20">
+    <section className="bg-white dark:bg-gray-900 py-4 mb-10 rounded-2xl md:rounded-3xl">
         <div className="container mx-auto px-4">
              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm md:text-lg font-bold text-gray-800 dark:text-white">پشتیبانی</h2>
@@ -21,7 +21,7 @@ const ContactSection: React.FC = () => {
                     </div>
                 </div>
                 
-                <a href="tel:02188888888" className="flex items-center gap-2 bg-white dark:bg-gray-700 shadow-sm border border-gray-100 dark:border-gray-600 px-4 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200">
+                <a href="tel:08791002848" className="flex items-center gap-2 bg-white dark:bg-gray-700 shadow-sm border border-gray-100 dark:border-gray-600 px-4 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200">
                     تماس
                     <ArrowLeft className="w-3 h-3" />
                 </a>

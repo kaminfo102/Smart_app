@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { User } from '../types';
 import { authService } from '../services/authService';
@@ -5,7 +6,7 @@ import { authService } from '../services/authService';
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<void>;
-  register: (data: { email: string; username: string; password: string; firstName?: string; lastName?: string }) => Promise<void>;
+  register: (data: { email: string; username: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => Promise<void>;
   updateUserProfile: (data: any) => Promise<void>;
   updateUserPoints: (points: number) => Promise<void>;
   logout: () => void;
@@ -43,7 +44,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (data: { email: string; username: string; password: string; firstName?: string; lastName?: string }) => {
+  const register = async (data: { email: string; username: string; password: string; firstName?: string; lastName?: string; mobile?: string }) => {
     setIsLoading(true);
     setError(null);
     try {

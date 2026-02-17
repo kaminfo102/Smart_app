@@ -1,4 +1,5 @@
 
+
 export interface Product {
   id: number;
   name: string;
@@ -211,4 +212,17 @@ export interface Question {
     text: string;
     options: string[];
     correct_index: number;
+}
+
+// --- Hero Slider Type ---
+
+export interface HeroSlide {
+  id: number;
+  title: string;
+  subtitle: string;
+  desc: string;
+  bg: string;
+  image: string;
+  cta: string;
+  link: string;
 }

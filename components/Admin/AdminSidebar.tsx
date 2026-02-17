@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, ShoppingBag, LogOut, X, Menu, BookOpen, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingBag, LogOut, X, Menu, BookOpen, HelpCircle, Image } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminSidebarProps {
-  activeTab: 'dashboard' | 'users' | 'orders' | 'lms' | 'help';
-  setActiveTab: (tab: 'dashboard' | 'users' | 'orders' | 'lms' | 'help') => void;
+  activeTab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'help';
+  setActiveTab: (tab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'help') => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   onLogout: () => void;
@@ -17,6 +17,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab, is
   const menuItems = [
     { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard },
     { id: 'lms', label: 'مدیریت ترم‌ها', icon: BookOpen },
+    { id: 'hero', label: 'مدیریت اسلایدر', icon: Image },
     { id: 'orders', label: 'سفارشات', icon: ShoppingBag },
     { id: 'users', label: 'کاربران', icon: Users },
     { id: 'help', label: 'راهنمای نصب', icon: HelpCircle },

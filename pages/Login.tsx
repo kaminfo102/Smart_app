@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, User, Lock, AlertTriangle, ArrowLeft, Mail, UserPlus, MapPin, Briefcase, Eye, EyeOff } from 'lucide-react';
+import { LogIn, User, Lock, AlertTriangle, ArrowLeft, Mail, UserPlus, MapPin, Briefcase, Eye, EyeOff, Phone, CheckCircle, XCircle, X } from 'lucide-react';
 import { authService } from '../services/authService';
 
 const Login: React.FC = () => {
@@ -11,8 +11,9 @@ const Login: React.FC = () => {
   // Form Fields
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); // Added confirm password
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [province, setProvince] = useState('');
@@ -20,11 +21,30 @@ const Login: React.FC = () => {
   const [representative, setRepresentative] = useState('');
   
   // UI State
-  const [showPassword, setShowPassword] = useState(false); // Toggle for main password
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // Toggle for confirm password
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Notification State
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const { login, register, isLoading, error } = useAuth();
+  const { login, register, isLoading, error: authError } = useAuth();
   const navigate = useNavigate();
+
+  // Helper to show notification
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    // Auto hide after 4 seconds
+    setTimeout(() => {
+        setNotification((prev) => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
+
+  // Sync Auth Context Error with Notification
+  useEffect(() => {
+      if (authError) {
+          showNotification(authError, 'error');
+      }
+  }, [authError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,38 +52,63 @@ const Login: React.FC = () => {
       if (isLoginMode) {
         await login(username, password);
         
-        // Post-login redirect logic
-        const currentUser = authService.getCurrentUser();
-        if (currentUser?.roles?.includes('instructor')) {
-            navigate('/instructor');
-        } else if (currentUser?.roles?.includes('administrator')) {
-            navigate('/admin');
-        } else {
-            navigate('/dashboard');
-        }
+        showNotification('ورود با موفقیت انجام شد! در حال انتقال...', 'success');
+        
+        // Short delay to show success message before redirect
+        setTimeout(() => {
+            const currentUser = authService.getCurrentUser();
+            if (currentUser?.roles?.includes('instructor')) {
+                navigate('/instructor');
+            } else if (currentUser?.roles?.includes('administrator')) {
+                navigate('/admin');
+            } else {
+                navigate('/dashboard');
+            }
+        }, 1000);
 
       } else {
         // Validation for Registration
         if (password !== confirmPassword) {
-            alert('رمز عبور و تکرار آن مطابقت ندارند.');
+            showNotification('رمز عبور و تکرار آن مطابقت ندارند.', 'error');
             return;
         }
 
-        // Register with extra fields (mocked in authService usually)
-        await register({ username, password, email, firstName, lastName });
-        alert('ثبت نام با موفقیت انجام شد. لطفا وارد شوید.');
+        // Mobile Validation (Iran Format)
+        const mobileRegex = /^0?9\d{9}$/;
+        if (!mobileRegex.test(mobile)) {
+            showNotification('لطفا شماره موبایل معتبر وارد کنید (مثال: 09185227309).', 'error');
+            return;
+        }
+
+        await register({ username, password, email, firstName, lastName, mobile: mobile });
+        showNotification('ثبت نام با موفقیت انجام شد. لطفا وارد شوید.', 'success');
+        
         setIsLoginMode(true);
         // Reset fields
         setPassword('');
         setConfirmPassword('');
+        setMobile('');
       }
     } catch (err) {
-      // Error is handled in context
+      // Error is handled in context and useEffect above, 
+      // but if register throws directly we might catch it here if not handled in context
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 py-10">
+    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 py-10 relative">
+      
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl transition-all duration-300 animate-in slide-in-from-top-5 fade-in ${notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+            {notification.type === 'success' ? <CheckCircle className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
+            <span className="font-bold text-sm">{notification.message}</span>
+            <button onClick={() => setNotification(null)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                <X className="w-4 h-4" />
+            </button>
+        </div>
+      )}
+
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
         
         {/* Toggle Header */}
@@ -91,12 +136,7 @@ const Login: React.FC = () => {
           </h1>
         </div>
 
-        {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm flex items-start gap-2 animate-pulse">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
+        {/* Removed static error div in favor of toast notification */}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
@@ -121,6 +161,22 @@ const Login: React.FC = () => {
                         className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
                     />
                  </div>
+             </div>
+
+             {/* Mobile Number Field */}
+             <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">شماره موبایل <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-primary-500 outline-none transition-all dir-ltr text-right"
+                    placeholder="09123456789"
+                    required
+                  />
+                  <Phone className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
+                </div>
              </div>
 
              {/* Location & Representative */}

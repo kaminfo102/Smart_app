@@ -1,45 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { ChevronLeft, Star } from 'lucide-react';
+import { heroService } from '../../services/heroService';
+import { HeroSlide } from '../../types';
 
 const HeroSlider: React.FC = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
-
-  const heroSlides = [
-    {
-      id: 1,
-      title: "نابغه کوچک خود را کشف کنید",
-      subtitle: "آموزش چرتکه",
-      desc: "افزایش تمرکز و خلاقیت فرزندتان",
-      bg: "from-blue-600 to-indigo-800",
-      image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=2022&auto=format&fit=crop", 
-      cta: "شروع کنید",
-      link: "/training"
-    },
-    {
-      id: 2,
-      title: "فروشگاه ابزار آموزشی",
-      subtitle: "خرید آنلاین",
-      desc: "بهترین چرتکه‌ها و کتاب‌های آموزشی",
-      bg: "from-purple-600 to-pink-800",
-      image: "https://images.unsplash.com/photo-1596495578065-6e0763fa1178?q=80&w=2071&auto=format&fit=crop",
-      cta: "خرید کنید",
-      link: "/store"
-    }
-  ];
+  const [slides, setSlides] = useState<HeroSlide[]>([]);
 
   useEffect(() => {
+    setSlides(heroService.getSlides());
+  }, []);
+
+  useEffect(() => {
+    if (slides.length === 0) return;
     const interval = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+        setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [heroSlides.length]);
+  }, [slides.length]);
+
+  if (slides.length === 0) return null;
 
   return (
     <section className="px-3 md:px-4">
         <div className="relative w-full aspect-[2/1] md:aspect-[3/1] lg:aspect-[4/1] overflow-hidden rounded-2xl md:rounded-3xl shadow-md">
-            {heroSlides.map((slide, index) => (
+            {slides.map((slide, index) => (
                 <div 
                     key={slide.id}
                     className={`absolute inset-0 transition-all duration-700 ease-in-out ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
@@ -81,7 +68,7 @@ const HeroSlider: React.FC = () => {
 
             {/* Dots Indicator */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
-                {heroSlides.map((_, idx) => (
+                {slides.map((_, idx) => (
                     <button 
                         key={idx} 
                         onClick={() => setCurrentSlide(idx)}

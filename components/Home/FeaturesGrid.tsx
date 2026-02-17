@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 
 const FeaturesGrid: React.FC = () => {
   return (
-    <section className="bg-white dark:bg-gray-900 py-4 mb-2">
+    <section className="bg-white dark:bg-gray-900 py-4 mb-2 rounded-2xl md:rounded-3xl">
         <div className="container mx-auto px-4">
             {/* App-like Header */}
             <div className="flex items-center justify-between mb-4">

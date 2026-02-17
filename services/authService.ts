@@ -102,7 +102,7 @@ export const authService = {
     }
   },
 
-  register: async (data: { email: string; username: string; password: string; firstName?: string; lastName?: string }): Promise<void> => {
+  register: async (data: { email: string; username: string; password: string; firstName?: string; lastName?: string; mobile?: string }): Promise<void> => {
     const config = getWooConfig();
     
     if (config.key && config.secret) {
@@ -116,6 +116,17 @@ export const authService = {
           password: data.password,
           first_name: data.firstName,
           last_name: data.lastName,
+          billing: {
+            first_name: data.firstName,
+            last_name: data.lastName,
+            email: data.email,
+            phone: data.mobile
+          },
+          shipping: {
+            first_name: data.firstName,
+            last_name: data.lastName,
+            phone: data.mobile
+          },
           meta_data: [
               { key: 'abacus_points', value: '0' }
           ]
