@@ -3,7 +3,7 @@ import React from 'react';
 import { useStore } from '../contexts/StoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Home, Grid, Sun, Moon, Search, Store, Settings, LogIn, User, LogOut, ShoppingBag, Calculator, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, Home, Grid, Sun, Moon, Search, Store, Settings, LogIn, User, LogOut, ShoppingBag, Calculator, LayoutDashboard, GraduationCap } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,11 +14,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isAdmin = user?.roles?.includes('administrator');
+  const isInstructor = user?.roles?.includes('instructor') || isAdmin; // Simple check
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Don't show layout on admin panel if it has its own sidebar
-  if (location.pathname.startsWith('/admin')) {
+  // Don't show layout on admin panel or course viewer if it has its own sidebar
+  if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/course/')) {
       return <>{children}</>;
   }
 
@@ -42,10 +43,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
              {/* Desktop Navigation Links */}
              <nav className="hidden md:flex items-center gap-6 mx-4 text-sm font-bold">
                 <Link to="/" className={`${isActive('/') ? 'text-primary-600' : 'text-gray-500 dark:text-gray-400'} hover:text-primary-600 transition-colors`}>خانه</Link>
+                {user && (
+                  <Link to="/dashboard" className={`${isActive('/dashboard') ? 'text-primary-600' : 'text-gray-500 dark:text-gray-400'} hover:text-primary-600 transition-colors flex items-center gap-1`}>
+                    <GraduationCap className="w-4 h-4" />
+                    مدرسه من
+                  </Link>
+                )}
                 <Link to="/store" className={`${isActive('/store') ? 'text-primary-600' : 'text-gray-500 dark:text-gray-400'} hover:text-primary-600 transition-colors`}>فروشگاه</Link>
                 <Link to="/training" className={`${isActive('/training') ? 'text-primary-600' : 'text-gray-500 dark:text-gray-400'} hover:text-primary-600 flex items-center gap-1 transition-colors`}>
                     <Calculator className="w-4 h-4" />
-                    آموزش
+                    تمرین آزاد
                 </Link>
              </nav>
 
@@ -68,6 +75,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <span className="hidden lg:inline">پنل مدیریت</span>
                     </Link>
                 </div>
+            )}
+            
+            {isInstructor && (
+                 <Link to="/instructor" className="p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs flex items-center gap-1 transition-colors" title="پنل مربی">
+                    <User className="w-4 h-4" />
+                    <span className="hidden lg:inline">مربی</span>
+                 </Link>
             )}
 
             {user ? (
@@ -111,10 +125,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <span className="text-[10px] font-medium">خانه</span>
           </Link>
 
-          <Link to="/training" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/training') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
-            <Calculator className={`w-6 h-6 ${isActive('/training') && 'fill-current'}`} />
-            <span className="text-[10px] font-medium">آموزش</span>
-          </Link>
+          {user && (
+            <Link to="/dashboard" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/dashboard') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                <GraduationCap className={`w-6 h-6 ${isActive('/dashboard') && 'fill-current'}`} />
+                <span className="text-[10px] font-medium">مدرسه</span>
+            </Link>
+          )}
 
           <div className="relative -top-5">
               <Link to="/store" className="flex items-center justify-center w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg shadow-primary-600/30 hover:scale-105 transition-transform">
@@ -122,16 +138,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
           </div>
 
-          <Link to="/cart" className="relative flex flex-col items-center justify-center w-full h-full space-y-1">
-             <div className={`relative transition-colors ${isActive('/cart') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
-                <ShoppingBag className={`w-6 h-6 ${isActive('/cart') && 'fill-current'}`} />
-                {cartCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center ring-2 ring-white dark:ring-gray-900">
-                    {cartCount}
-                    </span>
-                )}
-             </div>
-            <span className={`text-[10px] font-medium ${isActive('/cart') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'}`}>سبد</span>
+          <Link to="/training" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/training') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+            <Calculator className={`w-6 h-6 ${isActive('/training') && 'fill-current'}`} />
+            <span className="text-[10px] font-medium">تمرین</span>
           </Link>
 
           {user ? (

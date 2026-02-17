@@ -38,12 +38,13 @@ const getHeaders = (config: WooConfig) => {
 };
 
 export const wooService = {
-  getProducts: async (params: { category?: number; search?: string; min_price?: string; max_price?: string; orderby?: string; order?: string } = {}): Promise<Product[]> => {
+  getProducts: async (params: { category?: number; search?: string; min_price?: string; max_price?: string; orderby?: string; order?: string; tag?: number } = {}): Promise<Product[]> => {
     const config = getWooConfig();
     try {
       const baseUrl = config.url.replace(/\/$/, '');
       const queryParams = new URLSearchParams({ per_page: '50' });
       if (params.category) queryParams.append('category', params.category.toString());
+      if (params.tag) queryParams.append('tag', params.tag.toString());
       if (params.search) queryParams.append('search', params.search);
       if (params.min_price) queryParams.append('min_price', params.min_price);
       if (params.max_price) queryParams.append('max_price', params.max_price);
@@ -93,6 +94,55 @@ export const wooService = {
     }
   },
 
+  // --- Product Management (Create/Update/Delete) ---
+
+  createProduct: async (data: any): Promise<Product> => {
+      const config = getWooConfig();
+      const baseUrl = config.url.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products`, {
+          method: 'POST',
+          headers: getHeaders(config),
+          body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || 'Error creating product');
+      }
+      return await response.json();
+  },
+
+  updateProduct: async (id: number, data: any): Promise<Product> => {
+      const config = getWooConfig();
+      const baseUrl = config.url.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products/${id}`, {
+          method: 'PUT',
+          headers: getHeaders(config),
+          body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || 'Error updating product');
+      }
+      return await response.json();
+  },
+
+  deleteProduct: async (id: number): Promise<void> => {
+      const config = getWooConfig();
+      const baseUrl = config.url.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/wp-json/wc/v3/products/${id}?force=true`, {
+          method: 'DELETE',
+          headers: getHeaders(config)
+      });
+
+      if (!response.ok) {
+          throw new Error('Error deleting product');
+      }
+  },
+
+  // --- Categories & Others ---
+
   getCategories: async (): Promise<Category[]> => {
     const config = getWooConfig();
     try {
@@ -131,13 +181,14 @@ export const wooService = {
     } catch (e) { return []; }
   },
 
-  getOrders: async (params: { customer?: number, per_page?: number, page?: number } = {}): Promise<Order[]> => {
+  getOrders: async (params: { customer?: number, per_page?: number, page?: number, status?: string } = {}): Promise<Order[]> => {
     const config = getWooConfig();
     try {
         const baseUrl = config.url.replace(/\/$/, '');
         let url = `${baseUrl}/wp-json/wc/v3/orders?per_page=${params.per_page || 20}`;
         if (params.page) url += `&page=${params.page}`;
         if (params.customer) url += `&customer=${params.customer}`;
+        if (params.status) url += `&status=${params.status}`;
 
         const response = await fetch(url, { headers: getHeaders(config) });
         if (!response.ok) {
@@ -145,6 +196,8 @@ export const wooService = {
                  let retryUrl = `${baseUrl}/wp-json/wc/v3/orders?consumer_key=${config.key}&consumer_secret=${config.secret}&per_page=${params.per_page || 20}`;
                  if (params.page) retryUrl += `&page=${params.page}`;
                  if (params.customer) retryUrl += `&customer=${params.customer}`;
+                 if (params.status) retryUrl += `&status=${params.status}`;
+                 
                  const retry = await fetch(retryUrl);
                  if (!retry.ok) throw new Error('Error fetching orders');
                  return await retry.json();
@@ -224,6 +277,29 @@ export const wooService = {
         }
         throw new Error('Failed to update order');
     }
+  },
+
+  createOrderNote: async (orderId: number, note: string): Promise<void> => {
+      const config = getWooConfig();
+      const baseUrl = config.url.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}/notes`, {
+          method: 'POST',
+          headers: getHeaders(config),
+          body: JSON.stringify({ note })
+      });
+      
+      if (!response.ok) {
+           if (response.status === 401) {
+               const retry = await fetch(`${baseUrl}/wp-json/wc/v3/orders/${orderId}/notes?consumer_key=${config.key}&consumer_secret=${config.secret}`, {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ note })
+               });
+               if (!retry.ok) throw new Error('Failed to add order note');
+               return;
+           }
+           throw new Error('Failed to add order note');
+      }
   },
 
   deleteOrder: async (orderId: number): Promise<void> => {

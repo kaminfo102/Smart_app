@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Lock, User as UserIcon, UserCog, Trash2, X } from 'lucide-react';
+import { Search, Plus, Lock, User as UserIcon, UserCog, Trash2, X, GraduationCap, Link as LinkIcon, BookOpen } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { User } from '../../types';
 
@@ -14,6 +14,11 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [newUser, setNewUser] = useState({ username: '', email: '', password: '', role: 'customer' });
+    
+    // Assignment Modal
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
+    const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
 
     useEffect(() => {
         loadUsers();
@@ -22,14 +27,23 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
     const loadUsers = async () => {
         setLoading(true);
         try {
-            const data = await authService.getAllUsers(currentUser);
-            setUsers(data);
+            const wpUsers = await authService.getAllUsers(currentUser);
+            const wooCustomers = await authService.getCustomers();
+            
+            const merged = wpUsers.map(u => {
+                const customerData = wooCustomers.find(c => c.id === u.id);
+                return customerData ? { ...u, instructor_id: customerData.instructor_id } : u;
+            });
+            
+            setUsers(merged);
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
     };
+
+    const instructors = users.filter(u => u.roles?.includes('instructor') || u.roles?.includes('administrator'));
 
     const handleCreateUser = async () => {
         if(!newUser.username || !newUser.email || !newUser.password) return alert('تمام فیلدها الزامی است');
@@ -67,7 +81,66 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
         }
     };
 
+    const openAssignModal = (student: User) => {
+        setSelectedStudent(student);
+        setSelectedInstructorId(student.instructor_id ? String(student.instructor_id) : '');
+        setShowAssignModal(true);
+    };
+
+    const handleAssignInstructor = async () => {
+        if (!selectedStudent) return;
+        try {
+            const id = selectedInstructorId ? parseInt(selectedInstructorId) : null;
+            await authService.assignInstructor(selectedStudent.id, id);
+            
+            // Update local state
+            setUsers(prev => prev.map(u => 
+                u.id === selectedStudent.id ? { ...u, instructor_id: id || undefined } : u
+            ));
+            
+            setShowAssignModal(false);
+            setSelectedStudent(null);
+        } catch (e) {
+            alert('خطا در تخصیص مربی');
+        }
+    };
+
     const filteredUsers = users.filter(u => u.username.includes(search) || u.email.includes(search));
+
+    const getRoleBadge = (roles: string[] | undefined) => {
+        if (roles?.includes('administrator')) {
+            return (
+                <span className="bg-red-100 text-red-600 dark:bg-red-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
+                    <Lock className="w-3 h-3" /> مدیر
+                </span>
+            );
+        }
+        if (roles?.includes('instructor')) {
+             return (
+                <span className="bg-purple-100 text-purple-600 dark:bg-purple-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
+                    <BookOpen className="w-3 h-3" /> مربی
+                </span>
+            );
+        }
+        if (roles?.includes('student')) {
+             return (
+                <span className="bg-green-100 text-green-600 dark:bg-green-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
+                    <GraduationCap className="w-3 h-3" /> دانش‌آموز
+                </span>
+            );
+        }
+        return (
+            <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
+                <UserIcon className="w-3 h-3" /> مشتری
+            </span>
+        );
+    };
+
+    const getInstructorName = (id?: number) => {
+        if (!id) return '-';
+        const instructor = users.find(u => u.id === id);
+        return instructor ? instructor.display_name : `ID: ${id}`;
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in">
@@ -96,18 +169,19 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
 
             <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-right min-w-[600px]">
+                    <table className="w-full text-right min-w-[800px]">
                         <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 text-xs font-bold uppercase">
                             <tr>
                                 <th className="px-6 py-4">کاربر</th>
                                 <th className="px-6 py-4">نقش</th>
+                                <th className="px-6 py-4">مربی</th>
                                 <th className="px-6 py-4">ایمیل</th>
                                 <th className="px-6 py-4">عملیات</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                             {loading ? (
-                                <tr><td colSpan={4} className="text-center py-8">در حال بارگذاری...</td></tr>
+                                <tr><td colSpan={5} className="text-center py-8">در حال بارگذاری...</td></tr>
                             ) : filteredUsers.map(u => (
                                 <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                     <td className="px-6 py-4">
@@ -122,25 +196,31 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        {u.roles?.includes('administrator') ? (
-                                            <span className="bg-red-100 text-red-600 dark:bg-red-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
-                                                <Lock className="w-3 h-3" /> مدیر
-                                            </span>
-                                        ) : (
-                                            <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
-                                                <UserIcon className="w-3 h-3" /> مشتری
-                                            </span>
+                                        {getRoleBadge(u.roles)}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        {u.roles?.includes('instructor') ? '---' : (
+                                            <div className="flex items-center gap-2">
+                                                <span>{getInstructorName(u.instructor_id)}</span>
+                                                <button onClick={() => openAssignModal(u)} className="p-1 text-primary-600 hover:bg-primary-50 rounded" title="تغییر مربی">
+                                                    <LinkIcon className="w-3 h-3" />
+                                                </button>
+                                            </div>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-500 font-mono">{u.email}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <button 
-                                                onClick={() => handleUpdateRole(u, u.roles?.includes('administrator') ? 'customer' : 'administrator')}
-                                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-blue-500"
+                                            <select 
+                                                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 text-xs rounded-lg p-1 outline-none"
+                                                value={u.roles?.[0] || 'customer'}
+                                                onChange={(e) => handleUpdateRole(u, e.target.value)}
                                             >
-                                                <UserCog className="w-4 h-4" />
-                                            </button>
+                                                <option value="student">دانش‌آموز</option>
+                                                <option value="customer">مشتری</option>
+                                                <option value="instructor">مربی</option>
+                                                <option value="administrator">مدیر</option>
+                                            </select>
                                             <button 
                                                 onClick={() => handleDeleteUser(u.id)}
                                                 className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500"
@@ -156,7 +236,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Create User Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in duration-300">
@@ -184,11 +264,39 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
                                 value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}
                                 className="w-full bg-gray-50 dark:bg-gray-900 rounded-xl px-4 py-3 outline-none border border-gray-200 dark:border-gray-700"
                             >
+                                <option value="student">دانش‌آموز</option>
                                 <option value="customer">مشتری</option>
+                                <option value="instructor">مربی</option>
                                 <option value="administrator">مدیر کل</option>
                             </select>
                             <button onClick={handleCreateUser} className="w-full py-3 bg-primary-600 text-white font-bold rounded-xl shadow-lg mt-4">ایجاد کاربر</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Instructor Modal */}
+            {showAssignModal && selectedStudent && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                             <h3 className="text-xl font-bold">انتخاب مربی</h3>
+                             <button onClick={() => setShowAssignModal(false)}><X className="w-6 h-6 text-gray-400" /></button>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-4">
+                            مربی مسئول برای <span className="font-bold text-gray-900 dark:text-white">{selectedStudent.display_name}</span> را انتخاب کنید:
+                        </p>
+                        <select 
+                            value={selectedInstructorId} 
+                            onChange={(e) => setSelectedInstructorId(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-gray-900 rounded-xl px-4 py-3 outline-none border border-gray-200 dark:border-gray-700 mb-6"
+                        >
+                            <option value="">-- بدون مربی --</option>
+                            {instructors.map(inst => (
+                                <option key={inst.id} value={inst.id}>{inst.display_name} ({inst.username})</option>
+                            ))}
+                        </select>
+                        <button onClick={handleAssignInstructor} className="w-full py-3 bg-primary-600 text-white font-bold rounded-xl shadow-lg">ذخیره تغییرات</button>
                     </div>
                 </div>
             )}

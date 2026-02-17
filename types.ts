@@ -20,6 +20,7 @@ export interface Product {
   }[];
   related_ids?: number[];
   sku?: string;
+  meta_data?: { key: string; value: any }[];
 }
 
 export interface CartItem extends Product {
@@ -68,6 +69,12 @@ export interface User {
   shipping?: UserAddress;
   avatar_url?: string;
   points?: number;
+  coins?: number; // Virtual currency
+  province?: string;
+  city?: string;
+  representative_id?: number;
+  instructor_id?: number; // Added: Link to instructor
+  active_term_id?: number;
 }
 
 export interface OrderMetaData {
@@ -85,12 +92,14 @@ export interface Order {
   payment_method: string;
   payment_method_title: string;
   transaction_id: string;
+  customer_id: number;
   billing: UserAddress;
   shipping: UserAddress;
   meta_data: OrderMetaData[];
   line_items: {
     id: number;
     name: string;
+    product_id: number;
     quantity: number;
     total: string;
     price: number;
@@ -103,6 +112,7 @@ export interface CreateOrderPayload {
     set_paid: boolean;
     billing: UserAddress;
     shipping: UserAddress;
+    status?: string; // Added status field
     line_items: {
         product_id: number;
         quantity: number;
@@ -163,4 +173,42 @@ export interface LeaderboardUser {
   rank: number;
   isCurrentUser?: boolean;
   avatar_bg?: string;
+}
+
+// --- LMS Types ---
+
+export interface Term {
+    id: number;
+    title: string;
+    description: string;
+    price: number;
+    status: 'locked' | 'purchased_pending' | 'active' | 'completed' | 'rejected';
+    image: string;
+    lessons_count: number;
+    required_score: number;
+    lessons?: Lesson[]; // Added for editing purposes
+}
+
+export interface Lesson {
+    id: number;
+    term_id: number;
+    title: string;
+    type: 'theory' | 'video' | 'practice' | 'exam';
+    content?: string; // HTML for theory
+    video_url?: string;
+    practice_config?: {
+        target_count: number;
+        allow_error: number;
+        time_limit: number;
+    };
+    is_completed: boolean;
+    score?: number;
+    questions?: Question[]; // For exams
+}
+
+export interface Question {
+    id: number;
+    text: string;
+    options: string[];
+    correct_index: number;
 }

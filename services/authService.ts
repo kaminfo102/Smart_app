@@ -79,12 +79,12 @@ export const authService = {
             user.username = customerData.username;
             user.email = customerData.email;
             
-            // Extract Points from meta_data
-            const pointsMeta = customerData.meta_data
-                .filter((m: any) => m.key === 'abacus_points')
-                .pop();
-                
+            // Extract Points and Instructor from meta_data
+            const pointsMeta = customerData.meta_data.find((m: any) => m.key === 'abacus_points');
             user.points = pointsMeta ? parseInt(pointsMeta.value) : 0;
+
+            const instructorMeta = customerData.meta_data.find((m: any) => m.key === 'instructor_id');
+            user.instructor_id = instructorMeta ? parseInt(instructorMeta.value) : undefined;
           }
         } catch (e) {
           console.warn('Could not fetch WooCommerce customer data', e);
@@ -278,6 +278,38 @@ export const authService = {
     }
   },
 
+  // Fetch Customers with details (metadata) via Woo API
+  getCustomers: async (): Promise<User[]> => {
+    const config = getWooConfig();
+    const baseUrl = config.url.replace(/\/$/, '');
+    
+    try {
+        // Use role=all to ensure we get custom roles like 'student' if they are considered customers
+        const response = await fetch(`${baseUrl}/wp-json/wc/v3/customers?per_page=100&role=all&consumer_key=${config.key}&consumer_secret=${config.secret}`);
+        if (!response.ok) throw new Error('Failed to fetch customers');
+        
+        const data = await response.json();
+        return data.map((c: any) => {
+            const instructorMeta = c.meta_data.find((m: any) => m.key === 'instructor_id');
+            const roles = c.role ? [c.role] : [];
+            return {
+                id: c.id,
+                username: c.username,
+                email: c.email,
+                display_name: `${c.first_name} ${c.last_name}`.trim() || c.username,
+                first_name: c.first_name,
+                last_name: c.last_name,
+                roles: roles,
+                avatar_url: c.avatar_url,
+                instructor_id: instructorMeta ? parseInt(instructorMeta.value) : undefined
+            };
+        });
+    } catch(e) {
+        console.error(e);
+        return [];
+    }
+  },
+
   getLeaderboard: async (): Promise<any[]> => {
     const config = getWooConfig();
     const baseUrl = config.url.replace(/\/$/, '');
@@ -285,10 +317,7 @@ export const authService = {
     if (!config.key || !config.secret) return [];
 
     try {
-      // Fetch customers with their metadata
-      // Note: Standard Woo API doesn't support sorting by meta_value easily without plugins.
-      // We will fetch the latest 50 customers and sort them client-side for this demo.
-      const response = await fetch(`${baseUrl}/wp-json/wc/v3/customers?consumer_key=${config.key}&consumer_secret=${config.secret}&per_page=50`, {
+      const response = await fetch(`${baseUrl}/wp-json/wc/v3/customers?consumer_key=${config.key}&consumer_secret=${config.secret}&per_page=50&role=all`, {
           method: 'GET'
       });
 
@@ -308,7 +337,6 @@ export const authService = {
           };
       });
 
-      // Sort by points descending
       return leaderboard.sort((a: any, b: any) => b.points - a.points).slice(0, 10);
 
     } catch (e) {
@@ -317,22 +345,47 @@ export const authService = {
     }
   },
 
-  createUser: async (currentUser: User, newUser: any): Promise<void> => {
+  createUser: async (currentUser: User, newUser: any, metaData?: any[]): Promise<void> => {
       const config = getWooConfig();
       const baseUrl = config.url.replace(/\/$/, '');
       
-      const response = await fetch(`${baseUrl}/wp-json/wp/v2/users`, {
-          method: 'POST',
-          headers: { 
-              'Authorization': `Bearer ${currentUser.token}`,
-              'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(newUser)
-      });
+      // If we have API keys and we are creating a customer/student or need meta, prefer Woo API
+      if (config.key && config.secret && (newUser.role === 'customer' || newUser.role === 'student' || metaData)) {
+          const body: any = {
+              username: newUser.username,
+              email: newUser.email,
+              password: newUser.password,
+              first_name: newUser.firstName,
+              last_name: newUser.lastName,
+              role: newUser.roles ? newUser.roles[0] : (newUser.role || 'customer'),
+              meta_data: metaData || []
+          };
 
-      if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.message || 'خطا در ایجاد کاربر');
+          const response = await fetch(`${baseUrl}/wp-json/wc/v3/customers?consumer_key=${config.key}&consumer_secret=${config.secret}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+          });
+
+          if (!response.ok) {
+              const err = await response.json();
+              throw new Error(err.message || 'خطا در ایجاد کاربر');
+          }
+      } else {
+          // Fallback to WP User API
+          const response = await fetch(`${baseUrl}/wp-json/wp/v2/users`, {
+              method: 'POST',
+              headers: { 
+                  'Authorization': `Bearer ${currentUser.token}`,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(newUser)
+          });
+
+          if (!response.ok) {
+              const err = await response.json();
+              throw new Error(err.message || 'خطا در ایجاد کاربر');
+          }
       }
   },
 
@@ -353,6 +406,23 @@ export const authService = {
           const err = await response.json();
           throw new Error(err.message || 'خطا در ویرایش نقش کاربر');
       }
+  },
+
+  assignInstructor: async (studentId: number, instructorId: number | null): Promise<void> => {
+      const config = getWooConfig();
+      const baseUrl = config.url.replace(/\/$/, '');
+      
+      const response = await fetch(`${baseUrl}/wp-json/wc/v3/customers/${studentId}?consumer_key=${config.key}&consumer_secret=${config.secret}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              meta_data: [
+                  { key: 'instructor_id', value: instructorId ? String(instructorId) : '' }
+              ]
+          })
+      });
+
+      if (!response.ok) throw new Error('خطا در تخصیص مربی');
   },
 
   deleteUser: async (user: User, deleteId: number): Promise<void> => {

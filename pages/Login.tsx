@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, User, Lock, AlertTriangle, ArrowLeft, Mail, UserPlus } from 'lucide-react';
+import { LogIn, User, Lock, AlertTriangle, ArrowLeft, Mail, UserPlus, MapPin, Briefcase } from 'lucide-react';
+import { authService } from '../services/authService';
 
 const Login: React.FC = () => {
   const [isLoginMode, setIsLoginMode] = useState(true);
@@ -10,6 +12,10 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  // New Fields
+  const [province, setProvince] = useState('');
+  const [city, setCity] = useState('');
+  const [representative, setRepresentative] = useState('');
   
   const { login, register, isLoading, error } = useAuth();
   const navigate = useNavigate();
@@ -19,8 +25,19 @@ const Login: React.FC = () => {
     try {
       if (isLoginMode) {
         await login(username, password);
-        navigate('/');
+        
+        // Post-login redirect logic
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.roles?.includes('instructor')) {
+            navigate('/instructor');
+        } else if (currentUser?.roles?.includes('administrator')) {
+            navigate('/admin');
+        } else {
+            navigate('/dashboard');
+        }
+
       } else {
+        // Register with extra fields (mocked in authService usually)
         await register({ username, password, email, firstName, lastName });
         alert('ثبت نام با موفقیت انجام شد. لطفا وارد شوید.');
         setIsLoginMode(true);
@@ -55,11 +72,8 @@ const Login: React.FC = () => {
             {isLoginMode ? <LogIn className="w-8 h-8" /> : <UserPlus className="w-8 h-8" />}
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {isLoginMode ? 'ورود به حساب کاربری' : 'ایجاد حساب کاربری'}
+              {isLoginMode ? 'ورود به مدرسه' : 'ثبت نام دانش‌آموز'}
           </h1>
-          <p className="text-gray-500 text-sm mt-2">
-              {isLoginMode ? 'خوش آمدید! لطفا وارد شوید' : 'به جمع ما بپیوندید'}
-          </p>
         </div>
 
         {error && (
@@ -72,6 +86,7 @@ const Login: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           
           {!isLoginMode && (
+            <>
              <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-700 dark:text-gray-300">نام</label>
@@ -92,17 +107,48 @@ const Login: React.FC = () => {
                     />
                  </div>
              </div>
+
+             {/* Location & Representative */}
+             <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">استان</label>
+                    <select 
+                        value={province} onChange={e => setProvince(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                        <option value="">انتخاب...</option>
+                        <option value="Tehran">تهران</option>
+                        <option value="Kurdistan">کردستان</option>
+                        <option value="Isfahan">اصفهان</option>
+                    </select>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">نمایندگی</label>
+                    <div className="relative">
+                         <select 
+                            value={representative} onChange={e => setRepresentative(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 outline-none"
+                        >
+                            <option value="">انتخاب...</option>
+                            <option value="1">نمایندگی مرکزی</option>
+                            <option value="2">شعبه غرب</option>
+                        </select>
+                        <Briefcase className="absolute left-3 top-3.5 text-gray-400 w-4 h-4 pointer-events-none" />
+                    </div>
+                 </div>
+             </div>
+             </>
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-700 dark:text-gray-300">نام کاربری</label>
+            <label className="text-xs font-bold text-gray-700 dark:text-gray-300">کد ملی (نام کاربری)</label>
             <div className="relative">
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-primary-500 outline-none transition-all dir-ltr text-right"
-                placeholder="user_123"
+                placeholder="0012345678"
                 required
               />
               <User className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
@@ -111,15 +157,13 @@ const Login: React.FC = () => {
 
           {!isLoginMode && (
             <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">ایمیل</label>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">ایمیل (اختیاری)</label>
                 <div className="relative">
                 <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-primary-500 outline-none transition-all dir-ltr text-right"
-                    placeholder="example@mail.com"
-                    required
                 />
                 <Mail className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
                 </div>
@@ -153,20 +197,12 @@ const Login: React.FC = () => {
                </>
             ) : (
                 <>
-                    <span>{isLoginMode ? 'ورود' : 'ثبت نام'}</span>
+                    <span>{isLoginMode ? 'ورود' : 'ثبت نام و شروع'}</span>
                     <ArrowLeft className="w-5 h-5" />
                 </>
             )}
           </button>
         </form>
-        
-        <div className="mt-8 text-center border-t border-gray-100 dark:border-gray-700 pt-6">
-            <p className="text-xs text-gray-400">
-                {isLoginMode 
-                  ? 'اتصال واقعی نیازمند پلاگین JWT Authentication است.' 
-                  : 'برای ثبت نام، کلیدهای ووکامرس باید در تنظیمات وارد شده باشند.'}
-            </p>
-        </div>
       </div>
     </div>
   );
