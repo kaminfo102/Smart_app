@@ -1,10 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { wooService } from '../services/wooService';
 import { Product, Category } from '../types';
 import ProductCard from '../components/ProductCard';
 import HeroCarousel from '../components/HeroCarousel';
-import { Sparkles, Filter, X, Search, SlidersHorizontal, AlertOctagon, RefreshCcw, ChevronDown, Check } from 'lucide-react';
+import { Sparkles, Filter, X, Search, SlidersHorizontal, AlertOctagon, RefreshCcw, ChevronDown, Check, Loader2 } from 'lucide-react';
 
 const Store: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -18,6 +18,7 @@ const Store: React.FC = () => {
   const [priceRange, setPriceRange] = useState<{min: string, max: string}>({min: '', max: ''});
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState('date-desc'); // date-desc, price-asc, price-desc
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force effect re-run
 
   // Fetch Categories once
   useEffect(() => {
@@ -25,43 +26,48 @@ const Store: React.FC = () => {
   }, []);
 
   // Fetch Products on Filter Change
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const [sortBy, order] = sortOption.split('-');
+      const params: any = {
+          orderby: sortBy,
+          order: order,
+      };
+      if (selectedCategory) params.category = selectedCategory;
+      if (searchQuery) params.search = searchQuery;
+      if (priceRange.min) params.min_price = priceRange.min;
+      if (priceRange.max) params.max_price = priceRange.max;
+
+      const data = await wooService.getProducts(params);
+      setProducts(data);
+    } catch (err) {
+      console.error(err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCategory, priceRange, searchQuery, sortOption]);
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError(false);
-      try {
-        const [sortBy, order] = sortOption.split('-');
-        const params: any = {
-            orderby: sortBy,
-            order: order,
-        };
-        if (selectedCategory) params.category = selectedCategory;
-        if (searchQuery) params.search = searchQuery;
-        if (priceRange.min) params.min_price = priceRange.min;
-        if (priceRange.max) params.max_price = priceRange.max;
-
-        const data = await wooService.getProducts(params);
-        setProducts(data);
-      } catch (err) {
-        console.error(err);
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const debounce = setTimeout(() => {
         fetchProducts();
     }, 500); // Debounce for search/inputs
 
     return () => clearTimeout(debounce);
-  }, [selectedCategory, priceRange, searchQuery, sortOption]);
+  }, [fetchProducts, refreshTrigger]);
 
   const handleClearFilters = () => {
       setSelectedCategory(null);
       setPriceRange({min: '', max: ''});
       setSearchQuery('');
       setSortOption('date-desc');
+  };
+
+  const handleManualRefresh = () => {
+      wooService.clearCache(); // Force clear memory cache
+      setRefreshTrigger(prev => prev + 1); // Trigger re-fetch
   };
 
   if (error && products.length === 0) {
@@ -214,18 +220,28 @@ const Store: React.FC = () => {
                     {searchQuery ? `نتایج جستجو: "${searchQuery}"` : selectedCategory ? categories.find(c => c.id === selectedCategory)?.name : 'فروشگاه'}
                  </h1>
                  
-                 <div className="relative group">
-                     <select 
-                        value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value)}
-                        className="appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2 pr-8 text-sm outline-none focus:border-primary-500 cursor-pointer"
+                 <div className="flex gap-2">
+                     <button 
+                        onClick={handleManualRefresh}
+                        className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 p-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        title="بروزرسانی لیست"
+                        disabled={loading}
                      >
-                         <option value="date-desc">جدیدترین</option>
-                         <option value="price-asc">ارزان‌ترین</option>
-                         <option value="price-desc">گران‌ترین</option>
-                         <option value="popularity-desc">محبوب‌ترین</option>
-                     </select>
-                     <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                     </button>
+                     <div className="relative group">
+                         <select 
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value)}
+                            className="appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2 pr-8 text-sm outline-none focus:border-primary-500 cursor-pointer h-full"
+                         >
+                             <option value="date-desc">جدیدترین</option>
+                             <option value="price-asc">ارزان‌ترین</option>
+                             <option value="price-desc">گران‌ترین</option>
+                             <option value="popularity-desc">محبوب‌ترین</option>
+                         </select>
+                         <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                     </div>
                  </div>
              </div>
 

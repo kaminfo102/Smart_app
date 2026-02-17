@@ -145,6 +145,12 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
 // --- Service Methods ---
 
 export const wooService = {
+  // Manual Cache Invalidation
+  clearCache: () => {
+    cache.clear();
+    pendingRequests.clear();
+  },
+
   getProducts: async (params: { category?: number; search?: string; min_price?: string; max_price?: string; orderby?: string; order?: string; tag?: number; per_page?: number } = {}): Promise<Product[]> => {
     const queryParams: Record<string, string> = {
         per_page: (params.per_page || 50).toString(),
