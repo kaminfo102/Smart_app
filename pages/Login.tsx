@@ -2,21 +2,27 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, User, Lock, AlertTriangle, ArrowLeft, Mail, UserPlus, MapPin, Briefcase } from 'lucide-react';
+import { LogIn, User, Lock, AlertTriangle, ArrowLeft, Mail, UserPlus, MapPin, Briefcase, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../services/authService';
 
 const Login: React.FC = () => {
   const [isLoginMode, setIsLoginMode] = useState(true);
+  
+  // Form Fields
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); // Added confirm password
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  // New Fields
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
   const [representative, setRepresentative] = useState('');
   
+  // UI State
+  const [showPassword, setShowPassword] = useState(false); // Toggle for main password
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // Toggle for confirm password
+
   const { login, register, isLoading, error } = useAuth();
   const navigate = useNavigate();
 
@@ -37,10 +43,19 @@ const Login: React.FC = () => {
         }
 
       } else {
+        // Validation for Registration
+        if (password !== confirmPassword) {
+            alert('رمز عبور و تکرار آن مطابقت ندارند.');
+            return;
+        }
+
         // Register with extra fields (mocked in authService usually)
         await register({ username, password, email, firstName, lastName });
         alert('ثبت نام با موفقیت انجام شد. لطفا وارد شوید.');
         setIsLoginMode(true);
+        // Reset fields
+        setPassword('');
+        setConfirmPassword('');
       }
     } catch (err) {
       // Error is handled in context
@@ -174,16 +189,52 @@ const Login: React.FC = () => {
             <label className="text-xs font-bold text-gray-700 dark:text-gray-300">رمز عبور</label>
             <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 focus:ring-2 focus:ring-primary-500 outline-none transition-all dir-ltr text-right"
+                className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 pr-10 focus:ring-2 focus:ring-primary-500 outline-none transition-all dir-ltr text-right"
                 placeholder="••••••••"
                 required
               />
-              <Lock className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
+              {/* Lock moved to Right */}
+              <Lock className="absolute right-3 top-3.5 text-gray-400 w-5 h-5" />
+              {/* Eye moved to Left */}
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute left-3 top-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
+
+          {/* Confirm Password - Only in Registration Mode */}
+          {!isLoginMode && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">تکرار رمز عبور</label>
+                <div className="relative">
+                <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 pl-10 pr-10 focus:ring-2 focus:ring-primary-500 outline-none transition-all dir-ltr text-right"
+                    placeholder="••••••••"
+                    required
+                />
+                {/* Lock moved to Right */}
+                <Lock className="absolute right-3 top-3.5 text-gray-400 w-5 h-5" />
+                {/* Eye moved to Left */}
+                <button 
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute left-3 top-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+                </div>
+            </div>
+          )}
 
           <button
             type="submit"
