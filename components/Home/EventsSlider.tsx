@@ -7,16 +7,66 @@ import { AppEvent } from '../../types';
 
 const EventsSlider: React.FC = () => {
   const [events, setEvents] = useState<AppEvent[]>([]);
+  const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
-        const data = await eventService.getEvents();
-        // Filter only active events
-        setEvents(data.filter(e => e.isActive));
+        try {
+            const data = await eventService.getEvents();
+            // Filter only active events
+            setEvents(data.filter(e => e.isActive));
+        } catch (e) {
+            console.error("Failed to load events", e);
+        } finally {
+            setLoading(false);
+        }
     };
     fetchEvents();
   }, []);
+
+  // Loading Skeleton
+  if (loading) {
+      return (
+        <section className="px-3 md:px-4 mb-4">
+            {/* Header Skeleton */}
+            <div className="flex items-center justify-between mb-4 px-2">
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                    <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+                <div className="flex gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                </div>
+            </div>
+            
+            {/* Cards Skeleton */}
+            <div className="flex gap-4 overflow-hidden px-2">
+                {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex-none w-[280px] md:w-[320px] bg-white dark:bg-gray-800 rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm">
+                        {/* Image Placeholder */}
+                        <div className="h-40 bg-gray-200 dark:bg-gray-700 animate-pulse relative">
+                             <div className="absolute top-3 right-3 w-12 h-12 bg-white/20 rounded-xl"></div>
+                        </div>
+                        {/* Content Placeholders */}
+                        <div className="p-5 flex flex-col h-[160px] space-y-4">
+                            <div className="h-6 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            <div className="space-y-2">
+                                <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                                <div className="h-3 w-2/3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            </div>
+                            <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </section>
+      );
+  }
 
   if (events.length === 0) return null;
 
