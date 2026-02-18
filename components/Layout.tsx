@@ -125,18 +125,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <span className="text-[10px] font-medium">خانه</span>
           </Link>
 
-          {user && (
-            <Link to="/dashboard" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/dashboard') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
-                <GraduationCap className={`w-6 h-6 ${isActive('/dashboard') && 'fill-current'}`} />
-                <span className="text-[10px] font-medium">مدرسه</span>
+          
+            <Link to="/store" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/store') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                <Store className={`w-6 h-6 ${isActive('/store') && 'fill-current'}`} />
+                <span className="text-[10px] font-medium">فروشگاه</span>
             </Link>
-          )}
+          
 
-          <div className="relative -top-5">
+          {user &&(
+            <div className="relative -top-5">
+              <Link to="/dashboard" className="flex items-center justify-center w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg shadow-primary-600/30 hover:scale-105 transition-transform">
+                <GraduationCap className="w-6 h-6" />
+              </Link>
+          </div>
+
+          )}
+          
+{ /*<div className="relative -top-5">
               <Link to="/store" className="flex items-center justify-center w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg shadow-primary-600/30 hover:scale-105 transition-transform">
                 <Store className="w-6 h-6" />
               </Link>
-          </div>
+          </div> */}
 
           <Link to="/training" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive('/training') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
             <Calculator className={`w-6 h-6 ${isActive('/training') && 'fill-current'}`} />
