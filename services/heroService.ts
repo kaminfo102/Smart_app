@@ -1,6 +1,22 @@
-import { HeroSlide } from '../types';
 
-const STORAGE_KEY = 'hero_slides';
+import { HeroSlide } from '../types';
+import { getWooConfig } from './wooService';
+
+const CACHE_KEY = 'hero_slides_sql_cache';
+const CACHE_DURATION = 15 * 60 * 1000; // 15 Minutes Cache
+
+// Mapping Interface for Backend SQL Structure
+interface SqlSlide {
+    id: number;
+    title: string;
+    subtitle: string;
+    description: string;
+    bg: string;
+    image: string;
+    cta_text: string;
+    cta_link: string;
+    sort_order: number;
+}
 
 const DEFAULT_SLIDES: HeroSlide[] = [
     {
@@ -26,32 +42,113 @@ const DEFAULT_SLIDES: HeroSlide[] = [
 ];
 
 export const heroService = {
-  getSlides: (): HeroSlide[] => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
+  // --- Public: Get Slides (Fast SQL Read) ---
+  getSlides: async (): Promise<HeroSlide[]> => {
+    // 1. Check Local Cache
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const parsedCache = JSON.parse(cached);
+      if (Date.now() - parsedCache.timestamp < CACHE_DURATION) {
+        return parsedCache.data;
+      }
+    }
+
+    // 2. Fetch from Custom WP SQL API
+    try {
+      const config = getWooConfig();
+      const baseUrl = config.url.replace(/\/$/, '');
+      
+      const response = await fetch(`${baseUrl}/wp-json/lms/v1/slider`);
+      
+      if (!response.ok) throw new Error('Custom API not found or error');
+      
+      const sqlData: SqlSlide[] = await response.json();
+      
+      if (Array.isArray(sqlData) && sqlData.length > 0) {
+          // Map SQL columns to App types
+          const mappedSlides: HeroSlide[] = sqlData.map(s => ({
+              id: s.id,
+              title: s.title,
+              subtitle: s.subtitle,
+              desc: s.description, 
+              bg: s.bg,
+              image: s.image,
+              cta: s.cta_text,
+              link: s.cta_link
+          }));
+
+          // Update Cache
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
+              data: mappedSlides,
+              timestamp: Date.now()
+          }));
+          
+          return mappedSlides;
+      }
+    } catch (e) {
+      // console.warn("Using default slides.", e);
+    }
+
+    // 3. Fallback
     return DEFAULT_SLIDES;
   },
-  saveSlides: (slides: HeroSlide[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(slides));
+
+  // --- Admin: Save Slides (Bulk SQL Insert) ---
+  saveSlides: async (slides: HeroSlide[], token: string): Promise<void> => {
+    const config = getWooConfig();
+    const baseUrl = config.url.replace(/\/$/, '');
+    
+    // Map App types to SQL columns expected by PHP
+    const payload = slides.map(s => ({
+        title: s.title,
+        subtitle: s.subtitle,
+        description: s.desc,
+        bg: s.bg,
+        image: s.image,
+        cta: s.cta,
+        link: s.link
+    }));
+
+    const response = await fetch(`${baseUrl}/wp-json/lms/v1/slider`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `خطا در ذخیره سازی: ${response.status}`);
+    }
+
+    // Update Local Cache immediately
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+        data: slides,
+        timestamp: Date.now()
+    }));
   },
-  addSlide: (slide: Omit<HeroSlide, 'id'>) => {
-    const slides = heroService.getSlides();
-    const newSlide = { ...slide, id: Date.now() };
-    heroService.saveSlides([...slides, newSlide]);
-    return newSlide;
+
+  // --- Admin: Fix/Setup Database Table ---
+  setupDatabase: async (token: string): Promise<void> => {
+    const config = getWooConfig();
+    const baseUrl = config.url.replace(/\/$/, '');
+    
+    const response = await fetch(`${baseUrl}/wp-json/lms/v1/setup`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error('خطا در اجرای اسکریپت ساخت جدول');
+    }
   },
-  updateSlide: (updatedSlide: HeroSlide) => {
-    const slides = heroService.getSlides();
-    const newSlides = slides.map(s => s.id === updatedSlide.id ? updatedSlide : s);
-    heroService.saveSlides(newSlides);
-  },
-  deleteSlide: (id: number) => {
-    const slides = heroService.getSlides();
-    const newSlides = slides.filter(s => s.id !== id);
-    heroService.saveSlides(newSlides);
-  },
-  resetDefaults: () => {
-    localStorage.removeItem(STORAGE_KEY);
+
+  resetDefaults: (): HeroSlide[] => {
+    localStorage.removeItem(CACHE_KEY);
     return DEFAULT_SLIDES;
   }
 };
