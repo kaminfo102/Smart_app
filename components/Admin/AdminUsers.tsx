@@ -27,6 +27,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
     const loadUsers = async () => {
         setLoading(true);
         try {
+            // Use cached versions first
             const wpUsers = await authService.getAllUsers(currentUser);
             const wooCustomers = await authService.getCustomers();
             
@@ -56,7 +57,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
             });
             setShowModal(false);
             setNewUser({ username: '', email: '', password: '', role: 'customer' });
-            loadUsers();
+            loadUsers(); // Will fetch fresh because create invalidates cache
         } catch (e: any) {
             alert(e.message);
         }
@@ -75,7 +76,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
     const handleUpdateRole = async (targetUser: User, newRole: string) => {
         try {
             await authService.updateUserRole(currentUser, targetUser.id, [newRole]);
-            loadUsers();
+            loadUsers(); // Will fetch fresh because update invalidates cache
         } catch (e) {
             console.error(e);
         }

@@ -18,7 +18,8 @@ const AdminHero: React.FC = () => {
 
     const loadSlides = async () => {
         setIsLoading(true);
-        const data = await heroService.getSlides();
+        // Force refresh from server for admin panel
+        const data = await heroService.getSlides(true);
         setSlides(data);
         setIsLoading(false);
     };
@@ -54,6 +55,7 @@ const AdminHero: React.FC = () => {
                 }
             } catch (e: any) {
                 alert(e.message || 'خطا در ذخیره تغییرات');
+                loadSlides(); // Revert
             } finally {
                 setIsLoading(false);
             }
@@ -66,22 +68,17 @@ const AdminHero: React.FC = () => {
         const newSlides = [...slides];
         const targetIndex = direction === 'up' ? index - 1 : index + 1;
 
-        // Boundary checks
         if (targetIndex < 0 || targetIndex >= newSlides.length) return;
 
-        // Swap
         [newSlides[index], newSlides[targetIndex]] = [newSlides[targetIndex], newSlides[index]];
-
-        // Optimistic update
-        setSlides(newSlides);
+        setSlides(newSlides); // Optimistic
 
         try {
-            // Background save (don't show full loading spinner to keep UI snappy, but maybe disable buttons)
             await heroService.saveSlides(newSlides, user.token);
         } catch (e: any) {
             console.error(e);
             alert('خطا در ذخیره ترتیب جدید.');
-            loadSlides(); // Revert on error
+            loadSlides();
         }
     };
 
@@ -103,10 +100,9 @@ const AdminHero: React.FC = () => {
 
         try {
             if (user?.token) {
-                await heroService.saveSlides(newSlides, user.token);
-                setSlides(newSlides);
+                const freshSlides = await heroService.saveSlides(newSlides, user.token);
+                setSlides(freshSlides);
                 setIsEditing(false);
-                alert('تغییرات با موفقیت در دیتابیس ذخیره شد.');
             } else {
                 alert('خطا در دسترسی: لطفا مجدد وارد شوید.');
             }
@@ -135,8 +131,8 @@ const AdminHero: React.FC = () => {
 
     const handleReset = () => {
         if(window.confirm('آیا می‌خواهید تغییرات محلی را پاک کرده و دوباره از سرور بارگذاری کنید؟')) {
-            heroService.resetDefaults(); // Clears cache
-            loadSlides(); // Re-fetch
+            heroService.resetDefaults();
+            loadSlides();
         }
     };
 

@@ -2,19 +2,46 @@
 import { Term, Lesson, Question, User, UserAddress } from '../types';
 import { wooService } from './wooService';
 
-// We use a specific meta key to store the JSON structure of lessons within a WooCommerce Product
 const LMS_CONTENT_KEY = '_lms_lessons_data';
-const LMS_TERM_TAG = '_is_lms_term'; // We can use a tag or meta to identify Terms
+const LMS_TERM_TAG = '_is_lms_term';
+const CACHE_KEY_TERMS = 'lms_terms_cache';
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 export const lmsService = {
-    // Fetches Products that act as Terms
-    getTerms: async (): Promise<Term[]> => {
+    // 1. Get Cached Terms (Sync)
+    getCachedTerms: (): Term[] | null => {
+        const cached = localStorage.getItem(CACHE_KEY_TERMS);
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                return parsed.data;
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    },
+
+    // 2. Fetch Terms (Async with Skip Cache)
+    getTerms: async (skipCache = false): Promise<Term[]> => {
+        // Check cache first
+        if (!skipCache) {
+            const cached = localStorage.getItem(CACHE_KEY_TERMS);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Date.now() - parsed.timestamp < CACHE_DURATION) {
+                    return parsed.data;
+                }
+            }
+        }
+
         try {
-            // Fetch all products. In a real app, you might filter by category 'courses' or tag.
-            // Here we fetch recent products and filter client side for safety in demo
+            // Fetch all products. 
+            // Important: We bypass wooService cache here by using a custom param or skipCache if we implemented it there.
+            // But wooService.getProducts caches by URL params. 
             const products = await wooService.getProducts({ per_page: 50 } as any);
             
-            // To check user status for each term, we would normally fetch user orders.
+            // To check user status for each term
             const userOrders = await wooService.getOrders({ per_page: 100 }); 
             
             const terms: Term[] = products.filter((p: any) => {
@@ -22,8 +49,6 @@ export const lmsService = {
                  const isCourseCat = p.categories.some((c: any) => c.name.toLowerCase().includes('ترم') || c.name.toLowerCase().includes('course'));
                  return hasMeta || isCourseCat;
             }).map((p: any) => {
-                
-                // Parse Lessons Count from meta if possible
                 const meta = p.meta_data.find((m: any) => m.key === LMS_CONTENT_KEY);
                 let lessonsCount = 0;
                 if (meta) {
@@ -34,7 +59,6 @@ export const lmsService = {
                 }
 
                 // Determine Status based on Orders
-                // Find all orders for this product, sort by ID descending to get the LATEST status
                 const relatedOrders = userOrders.filter(o => 
                     o.line_items.some(item => item.product_id === p.id)
                 ).sort((a, b) => b.id - a.id);
@@ -64,9 +88,18 @@ export const lmsService = {
                 };
             });
 
+            // Save to Cache
+            localStorage.setItem(CACHE_KEY_TERMS, JSON.stringify({
+                data: terms,
+                timestamp: Date.now()
+            }));
+
             return terms;
         } catch (e) {
             console.error("LMS getTerms error", e);
+            // Return cached version if network fails
+            const cached = localStorage.getItem(CACHE_KEY_TERMS);
+            if (cached) return JSON.parse(cached).data;
             return [];
         }
     },
@@ -78,8 +111,6 @@ export const lmsService = {
             
             if (meta) {
                 try {
-                    // Start of JSON parse
-                    // Clean the string if WP added slashes
                     const jsonString = meta.value; 
                     const lessons: Lesson[] = JSON.parse(jsonString);
                     return lessons;
@@ -95,13 +126,12 @@ export const lmsService = {
     },
 
     saveTerm: async (termData: Partial<Term>, lessons: Lesson[]): Promise<void> => {
-        // Convert Term + Lessons into a WooCommerce Product Structure
         const productData = {
             name: termData.title,
             short_description: termData.description,
             regular_price: termData.price?.toString(),
             images: termData.image ? [{ src: termData.image }] : [],
-            categories: [{ id: 999 }], // Ideally find/create 'Courses' category ID. Using placeholder or existing.
+            categories: [{ id: 999 }], 
             meta_data: [
                 {
                     key: LMS_CONTENT_KEY,
@@ -115,22 +145,22 @@ export const lmsService = {
         };
 
         if (termData.id) {
-            // Update
             await wooService.updateProduct(termData.id, productData);
         } else {
-            // Create
             await wooService.createProduct({ ...productData, type: 'simple', virtual: true });
         }
+        
+        // Invalidate cache
+        localStorage.removeItem(CACHE_KEY_TERMS);
     },
 
     deleteTerm: async (termId: number): Promise<void> => {
         await wooService.deleteProduct(termId);
+        localStorage.removeItem(CACHE_KEY_TERMS);
     },
 
-    // Create a request (Order) for a term
     purchaseTerm: async (user: User, termId: number) => {
         try {
-            // Ensure fallback data is valid for WooCommerce
             const billingData: Partial<UserAddress> = user.billing || {};
             const defaultBilling = {
                 first_name: billingData.first_name || user.first_name || 'Student',
@@ -149,7 +179,7 @@ export const lmsService = {
                 payment_method: 'cheque', 
                 payment_method_title: 'درخواست فعالسازی دستی ترم',
                 set_paid: false,
-                status: 'on-hold', // Explicitly set as on-hold (request pending)
+                status: 'on-hold', 
                 billing: defaultBilling,
                 shipping: defaultBilling,
                 line_items: [
@@ -159,6 +189,8 @@ export const lmsService = {
                     }
                 ],
             });
+            // Force refresh of terms next time to show updated status
+            localStorage.removeItem(CACHE_KEY_TERMS);
         } catch (e) {
             console.error("Failed to purchase term", e);
             throw e;
@@ -171,26 +203,21 @@ export const lmsService = {
         localStorage.setItem('lms_progress', JSON.stringify(progress));
     },
 
-    // Helper to get questions (now extracted from lesson object)
     getQuestions: (termId: number): Question[] => {
         return [];
     },
 
     getStudentsPendingActivation: async (): Promise<any[]> => {
         try {
-            // Fetch orders with status 'on-hold' (manual request) or 'processing' (paid but not active)
             const orders = await wooService.getOrders({ status: 'on-hold,processing', per_page: 50 });
-            
-            // Map orders to a student request format
             return orders.map(order => {
-                // Find first product in order (assuming it's a term)
                 const termItem = order.line_items[0];
                 const studentName = `${order.billing.first_name} ${order.billing.last_name}`.trim() || 'کاربر ناشناس';
                 
                 return {
-                    id: order.id, // We use Order ID as the request ID
+                    id: order.id, 
                     student_id: order.billing.email, 
-                    customer_id: order.customer_id || 0, // Ensure customer_id is available
+                    customer_id: order.customer_id || 0,
                     name: studentName,
                     term_id: termItem?.product_id,
                     term_title: termItem?.name || 'محصول نامشخص',
@@ -198,7 +225,7 @@ export const lmsService = {
                     image: `https://ui-avatars.com/api/?name=${encodeURIComponent(studentName)}&background=random`,
                     status: order.status
                 };
-            }).filter(item => item.term_title !== 'محصول نامشخص'); // Basic filter
+            }).filter(item => item.term_title !== 'محصول نامشخص'); 
         } catch (e) {
             console.error("Error fetching pending students", e);
             return [];
@@ -206,10 +233,7 @@ export const lmsService = {
     },
 
     activateStudentTerm: async (orderId: number, instructorName?: string): Promise<void> => {
-        // To activate, we simply complete the order. 
         await wooService.updateOrder(orderId, 'completed');
-        
-        // Add note to WordPress order
         if (instructorName) {
             await wooService.createOrderNote(orderId, `ترم توسط مربی ${instructorName} فعال شد.`);
         }
@@ -217,8 +241,6 @@ export const lmsService = {
 
     rejectStudentTerm: async (orderId: number, instructorName?: string): Promise<void> => {
         await wooService.updateOrder(orderId, 'cancelled');
-        
-        // Add note to WordPress order
         if (instructorName) {
             await wooService.createOrderNote(orderId, `درخواست توسط مربی ${instructorName} رد شد.`);
         }

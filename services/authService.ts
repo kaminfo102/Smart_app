@@ -3,6 +3,9 @@ import { getWooConfig } from './wooService';
 import { User, TrainingSession } from '../types';
 
 const HISTORY_KEY = 'abacus_training_history';
+const CACHE_KEY_USERS = 'admin_users_cache';
+const CACHE_KEY_CUSTOMERS = 'admin_customers_cache';
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 export const authService = {
   login: async (username: string, password: string): Promise<User> => {
@@ -137,6 +140,9 @@ export const authService = {
         const err = await response.json();
         throw new Error(err.message || 'خطا در ثبت نام');
       }
+      // Clear cache to show new user in admin lists
+      localStorage.removeItem(CACHE_KEY_CUSTOMERS);
+      localStorage.removeItem(CACHE_KEY_USERS);
       return;
     } 
     throw new Error('برای ثبت نام باید کلیدهای API ووکامرس در تنظیمات وارد شده باشند.');
@@ -259,7 +265,15 @@ export const authService = {
 
   // --- Admin Functions ---
 
-  getAllUsers: async (user: User): Promise<User[]> => {
+  getAllUsers: async (user: User, skipCache = false): Promise<User[]> => {
+    if (!skipCache) {
+        const cached = localStorage.getItem(CACHE_KEY_USERS);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Date.now() - parsed.timestamp < CACHE_DURATION) return parsed.data;
+        }
+    }
+
     const config = getWooConfig();
     const baseUrl = config.url.replace(/\/$/, '');
     
@@ -272,8 +286,8 @@ export const authService = {
              throw new Error(`Error ${response.status}: Failed to fetch users`);
         }
         
-        const data = await response.json();
-        return data.map((u: any) => ({
+        const rawData = await response.json();
+        const data = rawData.map((u: any) => ({
             id: u.id,
             username: u.username,
             email: u.email,
@@ -283,14 +297,30 @@ export const authService = {
             roles: u.roles,
             avatar_url: u.avatar_urls?.[96]
         }));
+
+        localStorage.setItem(CACHE_KEY_USERS, JSON.stringify({ data, timestamp: Date.now() }));
+        return data;
+
     } catch (e: any) {
         console.error("getAllUsers error:", e);
+        if(!skipCache) {
+             const cached = localStorage.getItem(CACHE_KEY_USERS);
+             if(cached) return JSON.parse(cached).data;
+        }
         throw new Error(e.message || 'خطا در دریافت لیست کاربران');
     }
   },
 
   // Fetch Customers with details (metadata) via Woo API
-  getCustomers: async (): Promise<User[]> => {
+  getCustomers: async (skipCache = false): Promise<User[]> => {
+    if (!skipCache) {
+        const cached = localStorage.getItem(CACHE_KEY_CUSTOMERS);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Date.now() - parsed.timestamp < CACHE_DURATION) return parsed.data;
+        }
+    }
+
     const config = getWooConfig();
     const baseUrl = config.url.replace(/\/$/, '');
     
@@ -299,8 +329,8 @@ export const authService = {
         const response = await fetch(`${baseUrl}/wp-json/wc/v3/customers?per_page=100&role=all&consumer_key=${config.key}&consumer_secret=${config.secret}`);
         if (!response.ok) throw new Error('Failed to fetch customers');
         
-        const data = await response.json();
-        return data.map((c: any) => {
+        const rawData = await response.json();
+        const data = rawData.map((c: any) => {
             const instructorMeta = c.meta_data.find((m: any) => m.key === 'instructor_id');
             const roles = c.role ? [c.role] : [];
             return {
@@ -315,8 +345,16 @@ export const authService = {
                 instructor_id: instructorMeta ? parseInt(instructorMeta.value) : undefined
             };
         });
+
+        localStorage.setItem(CACHE_KEY_CUSTOMERS, JSON.stringify({ data, timestamp: Date.now() }));
+        return data;
+
     } catch(e) {
         console.error(e);
+        if(!skipCache) {
+             const cached = localStorage.getItem(CACHE_KEY_CUSTOMERS);
+             if(cached) return JSON.parse(cached).data;
+        }
         return [];
     }
   },
@@ -398,6 +436,8 @@ export const authService = {
               throw new Error(err.message || 'خطا در ایجاد کاربر');
           }
       }
+      localStorage.removeItem(CACHE_KEY_USERS);
+      localStorage.removeItem(CACHE_KEY_CUSTOMERS);
   },
 
   updateUserRole: async (currentUser: User, targetUserId: number, roles: string[]): Promise<void> => {
@@ -417,6 +457,7 @@ export const authService = {
           const err = await response.json();
           throw new Error(err.message || 'خطا در ویرایش نقش کاربر');
       }
+      localStorage.removeItem(CACHE_KEY_USERS);
   },
 
   assignInstructor: async (studentId: number, instructorId: number | null): Promise<void> => {
@@ -434,6 +475,7 @@ export const authService = {
       });
 
       if (!response.ok) throw new Error('خطا در تخصیص مربی');
+      localStorage.removeItem(CACHE_KEY_CUSTOMERS);
   },
 
   deleteUser: async (user: User, deleteId: number): Promise<void> => {
@@ -445,6 +487,8 @@ export const authService = {
             headers: { 'Authorization': `Bearer ${user.token}` }
         });
         if (!response.ok) throw new Error('Failed to delete user');
+        localStorage.removeItem(CACHE_KEY_USERS);
+        localStorage.removeItem(CACHE_KEY_CUSTOMERS);
     } catch (e: any) {
         console.error("deleteUser error:", e);
         throw new Error(e.message || 'خطا در حذف کاربر');

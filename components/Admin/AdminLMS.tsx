@@ -9,7 +9,7 @@ import { formatPrice } from '../../constants';
 const AdminLMS: React.FC = () => {
     const [terms, setTerms] = useState<Term[]>([]);
     const [loading, setLoading] = useState(true);
-    const [editingTerm, setEditingTerm] = useState<Term | undefined | null>(null); // null = list mode, undefined = create mode, Term = edit mode
+    const [editingTerm, setEditingTerm] = useState<Term | undefined | null>(null);
 
     useEffect(() => {
         loadTerms();
@@ -18,7 +18,8 @@ const AdminLMS: React.FC = () => {
     const loadTerms = async () => {
         setLoading(true);
         try {
-            const data = await lmsService.getTerms();
+            // true = skip cache for admin
+            const data = await lmsService.getTerms(true);
             setTerms(data);
         } catch (e) {
             console.error(e);

@@ -27,7 +27,19 @@ const Store: React.FC = () => {
 
   // Fetch Products on Filter Change
   const fetchProducts = useCallback(async () => {
-    setLoading(true);
+    // If it's a default query, try to load from cache first for SWR feel
+    const isDefaultQuery = !selectedCategory && !searchQuery && !priceRange.min && !priceRange.max && sortOption === 'date-desc';
+    
+    if (isDefaultQuery) {
+        const cached = wooService.getCachedProducts();
+        if (cached && cached.length > 0) {
+            setProducts(cached);
+            setLoading(false); // Immediate load
+        }
+    } else {
+        setLoading(true);
+    }
+    
     setError(false);
     try {
       const [sortBy, order] = sortOption.split('-');
@@ -44,7 +56,8 @@ const Store: React.FC = () => {
       setProducts(data);
     } catch (err) {
       console.error(err);
-      setError(true);
+      // Only set error if we don't have cached products visible
+      if (products.length === 0) setError(true);
     } finally {
       setLoading(false);
     }
@@ -66,7 +79,7 @@ const Store: React.FC = () => {
   };
 
   const handleManualRefresh = () => {
-      wooService.clearCache(); // Force clear memory cache
+      wooService.clearCache(); // Force clear memory cache and local storage
       setRefreshTrigger(prev => prev + 1); // Trigger re-fetch
   };
 

@@ -19,12 +19,33 @@ const StudentDashboard: React.FC = () => {
             navigate('/login');
             return;
         }
-        loadTerms();
+        
+        const initTerms = async () => {
+            // 1. Load from cache first
+            const cached = lmsService.getCachedTerms();
+            if (cached && cached.length > 0) {
+                setTerms(cached);
+                setLoading(false);
+            }
+
+            // 2. Fetch fresh
+            try {
+                const freshTerms = await lmsService.getTerms(true);
+                setTerms(freshTerms);
+                setLoading(false);
+            } catch (e) {
+                console.error("Failed to refresh terms");
+                if(!cached) setLoading(false);
+            }
+        };
+
+        initTerms();
     }, [user, navigate]);
 
-    const loadTerms = () => {
+    // Force refresh when needed
+    const reloadTerms = () => {
         setLoading(true);
-        lmsService.getTerms()
+        lmsService.getTerms(true)
             .then(setTerms)
             .catch(err => console.error("Failed to load terms", err))
             .finally(() => setLoading(false));
@@ -35,13 +56,11 @@ const StudentDashboard: React.FC = () => {
     const handleTermClick = async (term: Term) => {
         if (term.status === 'active') {
             navigate(`/course/${term.id}`);
-        } else if (term.status === 'locked' || term.status === 'rejected') {
-            // Logic handled in button click for clearer UX, but keeping here as fallback
         }
     };
 
     const handleRequestActivation = async (e: React.MouseEvent, term: Term) => {
-        e.stopPropagation(); // Prevent card click
+        e.stopPropagation(); 
         
         const confirmMsg = term.status === 'rejected' 
             ? `درخواست قبلی شما برای "${term.title}" رد شده است. آیا می‌خواهید درخواست جدیدی ارسال کنید؟` 
@@ -52,7 +71,7 @@ const StudentDashboard: React.FC = () => {
              try {
                  await lmsService.purchaseTerm(user, term.id);
                  alert('درخواست شما با موفقیت ثبت شد و در انتظار تایید مربی است.');
-                 loadTerms(); // Refresh to show pending status
+                 reloadTerms(); 
              } catch (err: any) {
                  console.error(err);
                  alert('خطا در ثبت درخواست: ' + (err.message || 'لطفا دوباره تلاش کنید.'));

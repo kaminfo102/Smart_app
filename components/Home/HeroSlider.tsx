@@ -11,12 +11,25 @@ const HeroSlider: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchSlides = async () => {
-        const data = await heroService.getSlides();
-        setSlides(data);
-        setLoading(false);
+    const initSlides = async () => {
+        // 1. Show Cached Immediately
+        const cached = heroService.getCachedSlides();
+        if (cached && cached.length > 0) {
+            setSlides(cached);
+            setLoading(false);
+        }
+
+        // 2. Fetch Fresh in Background
+        try {
+            const freshData = await heroService.getSlides(true); // Skip cache check
+            setSlides(freshData);
+            setLoading(false);
+        } catch (e) {
+            console.error("Failed to refresh slides", e);
+            if (!cached) setLoading(false); // Stop loading if failed and no cache
+        }
     };
-    fetchSlides();
+    initSlides();
   }, []);
 
   useEffect(() => {

@@ -3,9 +3,10 @@ import { DEFAULT_API_URL, DEFAULT_CONSUMER_KEY, DEFAULT_CONSUMER_SECRET } from '
 import { Product, Category, Order, CreateOrderPayload, Post } from '../types';
 
 const STORAGE_KEY = 'woo_config';
+const PRODUCTS_CACHE_KEY = 'woo_products_default_cache'; // New persistent cache
 
 // --- Cache Configuration ---
-const CACHE_TTL = 5 * 60 * 1000; // 5 Minutes Cache Time
+const CACHE_TTL = 5 * 60 * 1000; // 5 Minutes RAM Cache
 const cache = new Map<string, { data: any; expiry: number }>();
 const pendingRequests = new Map<string, Promise<any>>();
 
@@ -32,14 +33,15 @@ export const getWooConfig = (): WooConfig => {
 
 export const saveWooConfig = (url: string, key: string, secret: string) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ url, key, secret }));
-  cache.clear(); // Clear cache on config change
+  cache.clear(); 
+  localStorage.removeItem(PRODUCTS_CACHE_KEY); // Clear product cache on config change
 };
 
 // --- Advanced Fetch Wrapper ---
 interface RequestOptions extends RequestInit {
   skipCache?: boolean;
   params?: Record<string, string>;
-  isWpApi?: boolean; // Toggle between WC and WP API
+  isWpApi?: boolean; 
 }
 
 const request = async <T>(endpoint: string, options: RequestOptions = {}): Promise<T> => {
@@ -47,7 +49,6 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
   const baseUrl = config.url.replace(/\/$/, '');
   const apiPath = options.isWpApi ? '/wp-json/wp/v2' : '/wp-json/wc/v3';
   
-  // Construct URL with Params
   const urlObj = new URL(`${baseUrl}${apiPath}${endpoint}`);
   if (options.params) {
     Object.entries(options.params).forEach(([key, value]) => {
@@ -55,26 +56,22 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
     });
   }
 
-  // Generate Cache Key (URL + Params)
   const cacheKey = urlObj.toString();
 
-  // 1. Check Cache (GET requests only)
+  // RAM Cache
   if (!options.skipCache && (!options.method || options.method === 'GET')) {
     const cached = cache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
-      // console.log('🚀 Serving from Cache:', endpoint);
       return cached.data;
     }
   }
 
-  // 2. Request Deduplication (Prevent double fetching same resource)
   if (!options.skipCache && (!options.method || options.method === 'GET')) {
     if (pendingRequests.has(cacheKey)) {
       return pendingRequests.get(cacheKey);
     }
   }
 
-  // Auth Headers
   const auth = btoa(`${config.key}:${config.secret}`);
   const headers = {
     'Content-Type': 'application/json',
@@ -82,12 +79,10 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
     ...options.headers,
   };
 
-  // Create Promise
   const requestPromise = (async () => {
     try {
-      // Add Timeout functionality (Professional Touch)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); 
 
       const response = await fetch(urlObj.toString(), {
         ...options,
@@ -97,18 +92,16 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
 
       clearTimeout(timeoutId);
 
-      // Handle Retry for 401 (Fallback to query params auth)
       if (!response.ok && response.status === 401) {
         urlObj.searchParams.append('consumer_key', config.key);
         urlObj.searchParams.append('consumer_secret', config.secret);
         const retryResponse = await fetch(urlObj.toString(), {
             ...options,
-            headers: { ...options.headers, 'Content-Type': 'application/json' } // Remove Basic Auth header
+            headers: { ...options.headers, 'Content-Type': 'application/json' }
         });
         if (!retryResponse.ok) throw new Error(`API Error: ${retryResponse.status}`);
         const data = await retryResponse.json();
         
-        // Cache result
         if (!options.skipCache && (!options.method || options.method === 'GET')) {
            cache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL });
         }
@@ -121,7 +114,6 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
 
       const data = await response.json();
       
-      // Cache result
       if (!options.skipCache && (!options.method || options.method === 'GET')) {
         cache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL });
       }
@@ -142,13 +134,24 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
   return requestPromise;
 };
 
-// --- Service Methods ---
-
 export const wooService = {
-  // Manual Cache Invalidation
   clearCache: () => {
     cache.clear();
     pendingRequests.clear();
+    localStorage.removeItem(PRODUCTS_CACHE_KEY);
+  },
+
+  // 1. Get Cached Products (LocalStorage Sync)
+  getCachedProducts: (): Product[] | null => {
+      const cached = localStorage.getItem(PRODUCTS_CACHE_KEY);
+      if (cached) {
+          try {
+              const parsed = JSON.parse(cached);
+              // Return regardless of expiry for SWR
+              return parsed.data;
+          } catch(e) { return null; }
+      }
+      return null;
   },
 
   getProducts: async (params: { category?: number; search?: string; min_price?: string; max_price?: string; orderby?: string; order?: string; tag?: number; per_page?: number } = {}): Promise<Product[]> => {
@@ -163,7 +166,19 @@ export const wooService = {
         ...(params.order && { order: params.order }),
     };
 
-    return request<Product[]>('/products', { params: queryParams });
+    const isDefaultQuery = !params.category && !params.search && !params.min_price && !params.max_price && (!params.orderby || params.orderby === 'date');
+
+    const products = await request<Product[]>('/products', { params: queryParams });
+
+    // Update Persistent Cache only for default view
+    if (isDefaultQuery && products.length > 0) {
+        localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify({
+            data: products,
+            timestamp: Date.now()
+        }));
+    }
+
+    return products;
   },
 
   getProduct: async (id: number): Promise<Product> => {
@@ -175,10 +190,7 @@ export const wooService = {
   },
 
   updateProduct: async (id: number, data: any): Promise<Product> => {
-      // Invalidate specific product cache and products list potentially
       cache.delete(`${getWooConfig().url}/wp-json/wc/v3/products/${id}`); 
-      // Note: Invalidating list caches is harder without regex, typically we just let them expire or use a state manager.
-      
       return request<Product>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data), skipCache: true });
   },
 
@@ -192,20 +204,16 @@ export const wooService = {
     });
   },
 
-  // Note: Posts often need external proxy if CORS is an issue on WP API.
-  // We keep the proxy logic but wrap it nicely.
   getPosts: async (page: number = 1, per_page: number = 3): Promise<Post[]> => {
     const config = getWooConfig();
     const baseUrl = config.url.replace(/\/$/, '');
     const endpoint = `${baseUrl}/wp-json/wp/v2/posts?per_page=${per_page}&page=${page}&_embed`;
     const cacheKey = `posts_${page}_${per_page}`;
 
-    // Check Cache
     const cached = cache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) return cached.data;
 
     try {
-        // Try Direct
         const response = await fetch(endpoint);
         if (response.ok) {
             const data = await response.json();
@@ -214,7 +222,6 @@ export const wooService = {
         }
     } catch (err) { /* Fallback */ }
 
-    // Fallback Proxy
     try {
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(endpoint)}`;
         const proxyResponse = await fetch(proxyUrl);
@@ -234,10 +241,6 @@ export const wooService = {
         ...(params.customer && { customer: params.customer.toString() }),
         ...(params.status && { status: params.status }),
     };
-
-    // Important: Orders should usually NOT be cached long-term or skipCache should be true if we need realtime.
-    // We'll allow short caching but maybe we want to skip it for admin panels often.
-    // For now, let's cache but with the understanding that 'createOrder' should ideally invalidate.
     return request<Order[]>('/orders', { params: queryParams, skipCache: true }); 
   },
 
