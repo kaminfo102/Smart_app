@@ -1,6 +1,7 @@
 
 import React from 'react';
 import HeroSlider from '../components/Home/HeroSlider';
+import EventsSlider from '../components/Home/EventsSlider';
 import FeaturesGrid from '../components/Home/FeaturesGrid';
 import TrainingCTA from '../components/Home/TrainingCTA';
 import BlogSection from '../components/Home/BlogSection';
@@ -12,6 +13,7 @@ const Home: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-3 md:space-y-6">
         <HeroSlider />
         <FeaturesGrid />
+        <EventsSlider />
         <TrainingCTA />
         <BlogSection />
         <ContactSection />

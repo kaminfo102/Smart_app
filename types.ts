@@ -1,5 +1,6 @@
 
 
+
 export interface Product {
   id: number;
   name: string;
@@ -225,4 +226,15 @@ export interface HeroSlide {
   image: string;
   cta: string;
   link: string;
+}
+
+// --- Event Type ---
+export interface AppEvent {
+    id: number;
+    title: string;
+    description: string;
+    date: string;
+    image: string;
+    link: string;
+    isActive: boolean;
 }
