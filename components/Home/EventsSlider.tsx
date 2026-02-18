@@ -11,21 +11,31 @@ const EventsSlider: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchEvents = async () => {
+    const initData = async () => {
+        // 1. Strategy: Stale-While-Revalidate
+        // First, check if we have cached data to show immediately
+        const cached = eventService.getCachedEvents();
+        if (cached && cached.length > 0) {
+            setEvents(cached.filter(e => e.isActive));
+            setLoading(false); // Stop skeleton if we have cache
+        }
+
+        // 2. Fetch fresh data from server in background
         try {
-            const data = await eventService.getEvents();
-            // Filter only active events
-            setEvents(data.filter(e => e.isActive));
+            // true = skip cache and force network request
+            const freshData = await eventService.getEvents(true);
+            setEvents(freshData.filter(e => e.isActive));
+            setLoading(false);
         } catch (e) {
-            console.error("Failed to load events", e);
-        } finally {
+            console.error("Failed to refresh events", e);
             setLoading(false);
         }
     };
-    fetchEvents();
+
+    initData();
   }, []);
 
-  // Loading Skeleton
+  // Loading Skeleton (Only shows if no cache exists)
   if (loading) {
       return (
         <section className="px-3 md:px-4 mb-4">

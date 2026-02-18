@@ -18,7 +18,8 @@ const AdminEvents: React.FC = () => {
 
     const loadEvents = async () => {
         setIsLoading(true);
-        const data = await eventService.getEvents();
+        // Force refresh from server on admin load to ensure sync
+        const data = await eventService.getEvents(true);
         setEvents(data);
         setIsLoading(false);
     };
@@ -65,12 +66,14 @@ const AdminEvents: React.FC = () => {
 
     const saveChanges = async (newEvents: AppEvent[]) => {
         if (!user?.token) return alert('خطا در دسترسی');
-        setEvents(newEvents);
+        setEvents(newEvents); // Optimistic UI update
         try {
-            await eventService.saveEvents(newEvents, user.token);
+            // saveEvents now returns the fresh list from server
+            const freshEvents = await eventService.saveEvents(newEvents, user.token);
+            setEvents(freshEvents); 
         } catch (e: any) {
             alert('خطا در ذخیره: ' + e.message);
-            loadEvents(); // Revert
+            loadEvents(); // Revert on error
         }
     };
 
@@ -82,13 +85,14 @@ const AdminEvents: React.FC = () => {
         if (currentEvent.id) {
             newEvents = newEvents.map(e => e.id === currentEvent.id ? currentEvent as AppEvent : e);
         } else {
+            // Use temp ID for optimisitc update, will be replaced by server
             newEvents.push({ ...currentEvent, id: Date.now() } as AppEvent);
         }
 
         try {
             if (user?.token) {
-                await eventService.saveEvents(newEvents, user.token);
-                setEvents(newEvents);
+                const freshEvents = await eventService.saveEvents(newEvents, user.token);
+                setEvents(freshEvents);
                 setIsEditing(false);
             }
         } catch (e: any) {
@@ -111,7 +115,7 @@ const AdminEvents: React.FC = () => {
 
     if (isEditing) {
         return (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 animate-in fade-in">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold">{currentEvent.id ? 'ویرایش رویداد' : 'رویداد جدید'}</h2>
                     <button onClick={() => setIsEditing(false)}><X className="w-6 h-6" /></button>
