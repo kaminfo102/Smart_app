@@ -18,6 +18,7 @@ import AdminPanel from './pages/AdminPanel';
 import StudentDashboard from './pages/StudentDashboard';
 import CourseViewer from './pages/CourseViewer';
 import InstructorPanel from './pages/InstructorPanel';
+import Cooperation from './pages/Cooperation';
 import AIChat from './components/AIChat';
 
 const App: React.FC = () => {
@@ -37,6 +38,7 @@ const App: React.FC = () => {
               <Route path="/settings" element={<Settings />} />
               <Route path="/login" element={<Login />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/cooperation" element={<Cooperation />} />
               
               {/* LMS Routes */}
               <Route path="/dashboard" element={<StudentDashboard />} />

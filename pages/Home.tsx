@@ -6,6 +6,7 @@ import FeaturesGrid from '../components/Home/FeaturesGrid';
 import TrainingCTA from '../components/Home/TrainingCTA';
 import BlogSection from '../components/Home/BlogSection';
 import ContactSection from '../components/Home/ContactSection';
+import CooperationSection from '../components/Home/CooperationSection';
 
 const Home: React.FC = () => {
   return (
@@ -16,6 +17,7 @@ const Home: React.FC = () => {
         <EventsSlider />
         <TrainingCTA />
         <BlogSection />
+        <CooperationSection />
         <ContactSection />
       </div>
     </div>

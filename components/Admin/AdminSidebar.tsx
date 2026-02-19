@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, ShoppingBag, LogOut, X, Menu, BookOpen, HelpCircle, Image, Calendar, ArrowRight, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingBag, LogOut, X, Menu, BookOpen, HelpCircle, Image, Calendar, ArrowRight, Settings, Handshake } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminSidebarProps {
-  activeTab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'help' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'help' | 'settings') => void;
+  activeTab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'cooperation' | 'help' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'cooperation' | 'help' | 'settings') => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   onLogout: () => void;
@@ -19,6 +19,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab, is
     { id: 'lms', label: 'مدیریت ترم‌ها', icon: BookOpen },
     { id: 'hero', label: 'مدیریت اسلایدر', icon: Image },
     { id: 'events', label: 'مدیریت رویدادها', icon: Calendar },
+    { id: 'cooperation', label: 'درخواست‌های همکاری', icon: Handshake },
     { id: 'orders', label: 'سفارشات', icon: ShoppingBag },
     { id: 'users', label: 'کاربران', icon: Users },
     { id: 'settings', label: 'تنظیمات', icon: Settings },

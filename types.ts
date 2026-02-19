@@ -1,6 +1,4 @@
 
-
-
 export interface Product {
   id: number;
   name: string;
@@ -237,4 +235,19 @@ export interface AppEvent {
     image: string;
     link: string;
     isActive: boolean;
+}
+
+// --- Cooperation Type ---
+export interface CooperationRequest {
+    id?: number;
+    fullName: string;
+    education: string;
+    gender: 'Male' | 'Female';
+    province: string;
+    city: string;
+    type: 'Representative' | 'Instructor' | 'Supervisor';
+    mobile: string;
+    description: string;
+    created_at?: string;
+    status?: string;
 }
