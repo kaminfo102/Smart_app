@@ -25,7 +25,7 @@ const DEFAULT_SLIDES: HeroSlide[] = [
       subtitle: "آموزش چرتکه",
       desc: "افزایش تمرکز و خلاقیت فرزندتان",
       bg: "from-blue-600 to-indigo-800",
-      image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=2022&auto=format&fit=crop", 
+      image: "https://api.kurdkids.ir/wp-content/uploads/2026/01/Plus618.jpg", 
       cta: "شروع کنید",
       link: "/training"
     },
@@ -35,7 +35,7 @@ const DEFAULT_SLIDES: HeroSlide[] = [
       subtitle: "خرید آنلاین",
       desc: "بهترین چرتکه‌ها و کتاب‌های آموزشی",
       bg: "from-purple-600 to-pink-800",
-      image: "https://images.unsplash.com/photo-1596495578065-6e0763fa1178?q=80&w=2071&auto=format&fit=crop",
+      image: "https://api.kurdkids.ir/wp-content/uploads/2026/01/Plus214.jpg",
       cta: "خرید کنید",
       link: "/store"
     }

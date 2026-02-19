@@ -66,15 +66,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </button>
             
             {isAdmin && (
-                <div className="flex items-center gap-2">
-                    <Link to="/settings" className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors hidden md:block" title="تنظیمات اتصال">
-                        <Settings className="w-5 h-5" />
-                    </Link>
-                    <Link to="/admin" className="p-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs flex items-center gap-1 transition-colors" title="پنل مدیریت">
-                        <LayoutDashboard className="w-4 h-4" />
-                        <span className="hidden lg:inline">پنل مدیریت</span>
-                    </Link>
-                </div>
+                <Link to="/admin" className="p-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs flex items-center gap-1 transition-colors" title="پنل مدیریت">
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span className="hidden lg:inline">پنل مدیریت</span>
+                </Link>
             )}
             
             {isInstructor && (

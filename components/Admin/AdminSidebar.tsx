@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, ShoppingBag, LogOut, X, Menu, BookOpen, HelpCircle, Image, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingBag, LogOut, X, Menu, BookOpen, HelpCircle, Image, Calendar, ArrowRight, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AdminSidebarProps {
-  activeTab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'help';
-  setActiveTab: (tab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'help') => void;
+  activeTab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'help' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'users' | 'orders' | 'lms' | 'hero' | 'events' | 'help' | 'settings') => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   onLogout: () => void;
@@ -21,6 +21,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab, is
     { id: 'events', label: 'مدیریت رویدادها', icon: Calendar },
     { id: 'orders', label: 'سفارشات', icon: ShoppingBag },
     { id: 'users', label: 'کاربران', icon: Users },
+    { id: 'settings', label: 'تنظیمات', icon: Settings },
     { id: 'help', label: 'راهنمای نصب', icon: HelpCircle },
   ];
 
@@ -72,17 +73,28 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab, is
          </nav>
 
          <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-             <button 
-                onClick={() => {
-                    navigate('/');
-                    onLogout();
-                }} 
-                className="w-full flex items-center gap-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-3 rounded-xl transition-colors"
-             >
-                 <LogOut className="w-5 h-5" />
-                 <span className="font-bold">خروج</span>
-             </button>
+         <button 
+            onClick={() => {
+                navigate('/');
+                onLogout();
+            }} 
+            className="w-full flex items-center gap-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-3 rounded-xl transition-colors"
+         >
+             <LogOut className="w-5 h-5" />
+             <span className="font-bold">خروج</span>
+         </button>
+         <button 
+            onClick={() => {
+                navigate('/');
+                
+            }} 
+            className="w-full flex items-center gap-3 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 px-4 py-3 rounded-xl transition-colors"
+         >
+             <LogOut className="w-5 h-5" />
+             <span className="font-bold">صفحه اصلی</span>
+         </button>
          </div>
+         
       </aside>
     </>
   );
