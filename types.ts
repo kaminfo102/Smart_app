@@ -251,3 +251,17 @@ export interface CooperationRequest {
     created_at?: string;
     status?: string;
 }
+
+export interface Promotion {
+    id?: number;
+    title: string;
+    message: string;
+    image_url: string;
+    link_url: string;
+    delay_seconds: number;
+    duration_seconds: number;
+    is_active: boolean;
+    start_date?: string;
+    end_date?: string;
+    created_at?: string;
+}

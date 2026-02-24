@@ -54,7 +54,7 @@ const MobileNav: React.FC = () => {
               }
             `}
           >
-            {user ? <GraduationCap className="w-6 h-6" /> : <Calculator className="w-6 h-6" />}
+            {user ? <GraduationCap className="w-6 h-6" /> : <GraduationCap className="w-6 h-6" />}
           </Link>
         </div>
 

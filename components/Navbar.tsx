@@ -65,7 +65,7 @@ const Navbar: React.FC = () => {
     <>
       <header 
         className={`
-          fixed top-0 left-0 right-0 z-40 transition-all duration-300 border-b rounded-2xl mb-4
+          fixed top-0 left-0 right-0 z-40 transition-all duration-300 border-b
           ${scrolled 
             ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-gray-200 dark:border-gray-800 shadow-sm py-2' 
             : 'bg-white dark:bg-gray-900 border-transparent py-3 md:py-4'
@@ -98,12 +98,13 @@ const Navbar: React.FC = () => {
               <Link to="/" className="group flex flex-col items-center">
                 <div className={`
                   relative flex items-center justify-center transition-all duration-500
-                  ${scrolled ? 'w-10 h-10' : 'w-12 h-12'}
+                  ${scrolled ? 'w-12 h-12' : 'w-16 h-16'}
                 `}>
-                  <div className="absolute inset-0 bg-gradient-to-tr from-primary-600 to-primary-400 rounded-2xl rotate-6 group-hover:rotate-12 transition-transform opacity-20 dark:opacity-40"></div>
-                  <div className="absolute inset-0 bg-gradient-to-bl from-primary-600 to-primary-400 rounded-2xl -rotate-3 group-hover:-rotate-6 transition-transform shadow-lg shadow-primary-500/30 flex items-center justify-center text-white">
-                    <Store className={`${scrolled ? 'w-5 h-5' : 'w-6 h-6'}`} />
-                  </div>
+                  <img 
+                    src="/logo.jpg" 
+                    alt="کودکان هوشمند" 
+                    className="w-full h-full object-contain drop-shadow-md group-hover:scale-105 transition-transform"
+                  />
                 </div>
                 {!scrolled && (
                   <span className="mt-1 text-[10px] font-black tracking-wider text-primary-600 dark:text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity absolute top-full whitespace-nowrap hidden md:block">
@@ -181,9 +182,9 @@ const Navbar: React.FC = () => {
             
             {/* Menu Header */}
             <div className="p-6 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
-              <span className="font-black text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/50 rounded-lg flex items-center justify-center text-primary-600">
-                  <Store className="w-5 h-5" />
+              <span className="font-black text-lg text-gray-900 dark:text-white flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                  <img src="/logo.jpg" alt="Logo" className="w-full h-full object-contain" />
                 </div>
                 کودکان هوشمند
               </span>

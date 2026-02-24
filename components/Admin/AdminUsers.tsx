@@ -123,6 +123,13 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
                 </span>
             );
         }
+        if (roles?.includes('representative')) {
+             return (
+                <span className="bg-orange-100 text-orange-600 dark:bg-orange-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
+                    <UserCog className="w-3 h-3" /> نماینده
+                </span>
+            );
+        }
         if (roles?.includes('student')) {
              return (
                 <span className="bg-green-100 text-green-600 dark:bg-green-900/20 px-2 py-1 rounded-lg text-xs font-bold flex items-center w-fit gap-1">
@@ -220,6 +227,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
                                                 <option value="student">دانش‌آموز</option>
                                                 <option value="customer">مشتری</option>
                                                 <option value="instructor">مربی</option>
+                                                <option value="representative">نماینده</option>
                                                 <option value="administrator">مدیر</option>
                                             </select>
                                             <button 
@@ -268,6 +276,7 @@ const AdminUsers: React.FC<AdminUsersProps> = ({ currentUser }) => {
                                 <option value="student">دانش‌آموز</option>
                                 <option value="customer">مشتری</option>
                                 <option value="instructor">مربی</option>
+                                <option value="representative">نماینده</option>
                                 <option value="administrator">مدیر کل</option>
                             </select>
                             <button onClick={handleCreateUser} className="w-full py-3 bg-primary-600 text-white font-bold rounded-xl shadow-lg mt-4">ایجاد کاربر</button>
