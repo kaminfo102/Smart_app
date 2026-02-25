@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Store, Calculator, User, LogIn, GraduationCap } from 'lucide-react';
+import { Home, Store, Calculator, User, LogIn, GraduationCap, Briefcase } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const MobileNav: React.FC = () => {
@@ -45,16 +45,16 @@ const MobileNav: React.FC = () => {
         {/* Center Floating Button */}
         <div className="relative -top-6">
           <Link 
-            to={user ? "/dashboard" : "/training"} 
+            to={user?.roles?.includes('representative') ? "/panel" : (user ? "/dashboard" : "/training")} 
             className={`
               flex items-center justify-center w-14 h-14 rounded-full shadow-lg shadow-primary-600/30 hover:scale-105 transition-transform border-4 border-gray-50 dark:border-gray-900
-              ${isActive(user ? '/dashboard' : '/training') 
+              ${isActive(user?.roles?.includes('representative') ? '/panel' : (user ? '/dashboard' : '/training')) 
                 ? 'bg-primary-700 text-white' 
                 : 'bg-primary-600 text-white'
               }
             `}
           >
-            {user ? <GraduationCap className="w-6 h-6" /> : <GraduationCap className="w-6 h-6" />}
+            {user?.roles?.includes('representative') ? <Briefcase className="w-6 h-6" /> : (user ? <GraduationCap className="w-6 h-6" /> : <GraduationCap className="w-6 h-6" />)}
           </Link>
         </div>
 

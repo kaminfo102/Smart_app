@@ -5,8 +5,10 @@ import { Product, Category } from '../types';
 import ProductCard from '../components/ProductCard';
 import HeroCarousel from '../components/HeroCarousel';
 import { Sparkles, Filter, X, Search, SlidersHorizontal, AlertOctagon, RefreshCcw, ChevronDown, Check, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const Store: React.FC = () => {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,10 +22,31 @@ const Store: React.FC = () => {
   const [sortOption, setSortOption] = useState('date-desc'); // date-desc, price-asc, price-desc
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force effect re-run
 
-  // Fetch Categories once
+  // Fetch Categories once and set default category based on role
   useEffect(() => {
-      wooService.getCategories().then(setCategories).catch(console.error);
-  }, []);
+      wooService.getCategories().then(cats => {
+          setCategories(cats);
+          
+          // Role-based Category Filtering Logic
+          let targetCategoryName = 'عمومی'; // Default for guests
+          
+          if (user?.roles?.includes('representative')) {
+              targetCategoryName = 'نماینده';
+          } else if (user?.roles?.includes('student')) {
+              targetCategoryName = 'دانش آموز';
+          }
+
+          const targetCat = cats.find(c => c.name === targetCategoryName);
+          if (targetCat) {
+              setSelectedCategory(targetCat.id);
+          } else if (!user) {
+              // If 'General' category not found, maybe show all or handle gracefully
+              // For now, we leave it null (All Products) if 'General' doesn't exist, 
+              // OR we can strictly enforce it. 
+              // Let's try to find 'عمومی' again or fallback to null.
+          }
+      }).catch(console.error);
+  }, [user]);
 
   // Fetch Products on Filter Change
   const fetchProducts = useCallback(async () => {
@@ -64,6 +87,14 @@ const Store: React.FC = () => {
   }, [selectedCategory, priceRange, searchQuery, sortOption]);
 
   useEffect(() => {
+    // Skip fetch if categories haven't loaded yet and we expect a role-based default
+    // But we can't easily know if we are waiting for categories.
+    // However, selectedCategory is initialized to null. 
+    // If we are a representative, we WANT to wait until selectedCategory is set to 'Representative' ID.
+    // But fetchProducts runs whenever selectedCategory changes.
+    // So it will run once with null, then again when useEffect sets the ID.
+    // This is acceptable, but might cause a flash.
+    
     const debounce = setTimeout(() => {
         fetchProducts();
     }, 500); // Debounce for search/inputs
@@ -72,7 +103,23 @@ const Store: React.FC = () => {
   }, [fetchProducts, refreshTrigger]);
 
   const handleClearFilters = () => {
-      setSelectedCategory(null);
+      // Resetting filters should probably respect the role-based default
+      // But for now, let's clear everything. 
+      // If strict mode is required, we should reset TO the role default.
+      
+      let defaultCatId: number | null = null;
+      if (user?.roles?.includes('representative')) {
+          const cat = categories.find(c => c.name === 'نماینده');
+          if (cat) defaultCatId = cat.id;
+      } else if (user?.roles?.includes('student')) {
+          const cat = categories.find(c => c.name === 'دانش آموز');
+          if (cat) defaultCatId = cat.id;
+      } else if (!user) {
+          const cat = categories.find(c => c.name === 'عمومی');
+          if (cat) defaultCatId = cat.id;
+      }
+
+      setSelectedCategory(defaultCatId);
       setPriceRange({min: '', max: ''});
       setSearchQuery('');
       setSortOption('date-desc');
@@ -82,6 +129,14 @@ const Store: React.FC = () => {
       wooService.clearCache(); // Force clear memory cache and local storage
       setRefreshTrigger(prev => prev + 1); // Trigger re-fetch
   };
+
+  // Filter categories for sidebar based on role
+  const visibleCategories = categories.filter(cat => {
+      if (user?.roles?.includes('representative')) return cat.name === 'نماینده';
+      if (user?.roles?.includes('student')) return cat.name === 'دانش آموز';
+      if (!user) return cat.name === 'عمومی';
+      return true; // Admin or other roles see all
+  });
 
   if (error && products.length === 0) {
       return (
@@ -161,14 +216,16 @@ const Store: React.FC = () => {
                  <div className="space-y-3">
                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300">دسته‌بندی‌ها</label>
                      <div className="space-y-2">
-                         <button 
-                            onClick={() => setSelectedCategory(null)}
-                            className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${selectedCategory === null ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                         >
-                             <span>همه محصولات</span>
-                             {selectedCategory === null && <Check className="w-4 h-4" />}
-                         </button>
-                         {categories.map(cat => (
+                         {!user?.roles?.includes('representative') && !user?.roles?.includes('student') && (
+                             <button 
+                                onClick={() => setSelectedCategory(null)}
+                                className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${selectedCategory === null ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                             >
+                                 <span>همه محصولات</span>
+                                 {selectedCategory === null && <Check className="w-4 h-4" />}
+                             </button>
+                         )}
+                         {visibleCategories.map(cat => (
                              <button 
                                 key={cat.id}
                                 onClick={() => setSelectedCategory(cat.id)}
@@ -260,13 +317,13 @@ const Store: React.FC = () => {
 
              {/* Product Grid */}
              {loading ? (
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-                     {[1,2,3,4,5,6].map(i => (
-                         <div key={i} className="h-80 bg-gray-200 dark:bg-gray-800 rounded-2xl animate-pulse"></div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                     {[1,2,3,4,5,6,7,8].map(i => (
+                         <div key={i} className="h-64 bg-gray-200 dark:bg-gray-800 rounded-2xl animate-pulse"></div>
                      ))}
                 </div>
              ) : products.length > 0 ? (
-                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                 <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {products.map((product) => (
                         <ProductCard key={product.id} product={product} />
                     ))}

@@ -81,6 +81,7 @@ const Navbar: React.FC = () => {
               <NavLink to="/store" icon={Store}>فروشگاه</NavLink>
               <NavLink to="/training" icon={Calculator}>تمرین</NavLink>
               {user && <NavLink to="/dashboard" icon={GraduationCap}>مدرسه من</NavLink>}
+              {user?.roles?.includes('representative') && <NavLink to="/panel" icon={Briefcase}>پنل نمایندگی</NavLink>}
             </div>
 
             {/* Mobile Menu Button (Right) */}

@@ -332,6 +332,7 @@ export const authService = {
         const rawData = await response.json();
         const data = rawData.map((c: any) => {
             const instructorMeta = c.meta_data.find((m: any) => m.key === 'instructor_id');
+            const representativeMeta = c.meta_data.find((m: any) => m.key === 'representative_id');
             const roles = c.role ? [c.role] : [];
             return {
                 id: c.id,
@@ -342,7 +343,8 @@ export const authService = {
                 last_name: c.last_name,
                 roles: roles,
                 avatar_url: c.avatar_url,
-                instructor_id: instructorMeta ? parseInt(instructorMeta.value) : undefined
+                instructor_id: instructorMeta ? parseInt(instructorMeta.value) : undefined,
+                representative_id: representativeMeta ? parseInt(representativeMeta.value) : undefined
             };
         });
 

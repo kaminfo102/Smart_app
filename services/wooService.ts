@@ -82,7 +82,7 @@ const request = async <T>(endpoint: string, options: RequestOptions = {}): Promi
   const requestPromise = (async () => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); 
+      const timeoutId = setTimeout(() => controller.abort('Request timed out'), 30000); 
 
       const response = await fetch(urlObj.toString(), {
         ...options,

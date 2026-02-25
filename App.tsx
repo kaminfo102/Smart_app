@@ -18,6 +18,7 @@ import AdminPanel from './pages/AdminPanel';
 import StudentDashboard from './pages/StudentDashboard';
 import CourseViewer from './pages/CourseViewer';
 import InstructorPanel from './pages/InstructorPanel';
+import RepresentativePanel from './pages/RepresentativePanel';
 import Cooperation from './pages/Cooperation';
 // import AIChat from './components/AIChat';
 import PromotionDialog from './components/PromotionDialog';
@@ -45,12 +46,13 @@ const App: React.FC = () => {
               <Route path="/dashboard" element={<StudentDashboard />} />
               <Route path="/course/:id" element={<CourseViewer />} />
               <Route path="/instructor" element={<InstructorPanel />} />
+              <Route path="/panel" element={<RepresentativePanel />} />
 
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/categories" element={<div className="text-center pt-20 text-gray-500">صفحه دسته‌بندی (به زودی)</div>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-            {/* <AIChat /> */}
+            { /* <AIChat /> */}
             <PromotionDialog />
           </Layout>
         </Router>
