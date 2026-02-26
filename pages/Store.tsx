@@ -160,7 +160,8 @@ const Store: React.FC = () => {
   }
 
   return (
-    <div className="pb-10 pt-4 px-2 md:px-0">
+    <div className="max-w-7xl mx-auto px-4 py-8 pb-24">
+    {/* <div className="pb-10 pt-4 px-2 md:px-0"> */}
       
       {/* Mobile Filter Toggle & Search */}
       <div className="md:hidden flex gap-2 mb-4 sticky top-20 z-20">

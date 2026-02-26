@@ -23,16 +23,18 @@ const RepresentativeUsers: React.FC<RepresentativeUsersProps> = ({ currentUser, 
     const loadUsers = async () => {
         setLoading(true);
         try {
-            // Fetch customers (which includes students and instructors created via Woo API)
-            // We use getCustomers because it returns meta_data like representative_id
-            const allUsers = await authService.getCustomers();
+            // Use getAllUsers which uses WP API and Token (better for Representatives who don't have API Keys)
+            // Ensure getAllUsers maps the meta fields correctly
+            const allUsers = await authService.getAllUsers(currentUser, true); // skip cache
             
+            console.log('All Users Fetched:', allUsers);
+
             const filtered = allUsers.filter(u => {
                 // Filter by role
                 const hasRole = u.roles?.includes(targetRole);
                 // Filter by representative ownership
                 // We check if the user's representative_id matches the current logged-in representative's ID
-                const isOwnedByRep = u.representative_id === currentUser.id;
+                const isOwnedByRep = u.representative_id == currentUser.id; // Loose equality for string/number safety
                 
                 return hasRole && isOwnedByRep;
             });

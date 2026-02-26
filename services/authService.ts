@@ -295,7 +295,10 @@ export const authService = {
             first_name: u.first_name,
             last_name: u.last_name,
             roles: u.roles,
-            avatar_url: u.avatar_urls?.[96]
+            avatar_url: u.avatar_urls?.[96],
+            // Map meta fields if available (requires register_meta with show_in_rest)
+            representative_id: u.meta?.representative_id ? parseInt(u.meta.representative_id) : undefined,
+            instructor_id: u.meta?.instructor_id ? parseInt(u.meta.instructor_id) : undefined
         }));
 
         localStorage.setItem(CACHE_KEY_USERS, JSON.stringify({ data, timestamp: Date.now() }));
@@ -400,6 +403,43 @@ export const authService = {
       const config = getWooConfig();
       const baseUrl = config.url.replace(/\/$/, '');
       
+      // If Representative, use custom endpoint to bypass capability checks
+      if (currentUser.roles?.includes('representative')) {
+          const body = {
+              username: newUser.username,
+              email: newUser.email,
+              password: newUser.password,
+              first_name: newUser.firstName || newUser.first_name,
+              last_name: newUser.lastName || newUser.last_name,
+              role: newUser.roles ? newUser.roles[0] : newUser.role,
+              meta: {} as any
+          };
+
+          if (metaData) {
+              metaData.forEach(m => {
+                  body.meta[m.key] = m.value;
+              });
+          }
+
+          const response = await fetch(`${baseUrl}/wp-json/lms/v1/create-user`, {
+              method: 'POST',
+              headers: { 
+                  'Authorization': `Bearer ${currentUser.token}`,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(body)
+          });
+
+          if (!response.ok) {
+              const err = await response.json();
+              throw new Error(err.message || 'خطا در ایجاد کاربر');
+          }
+          
+          localStorage.removeItem(CACHE_KEY_USERS);
+          localStorage.removeItem(CACHE_KEY_CUSTOMERS);
+          return;
+      }
+      
       // If we have API keys and we are creating a customer/student or need meta, prefer Woo API
       if (config.key && config.secret && (newUser.role === 'customer' || newUser.role === 'student' || metaData)) {
           const body: any = {
@@ -424,19 +464,46 @@ export const authService = {
           }
       } else {
           // Fallback to WP User API
+          const wpBody = { ...newUser };
+          
+          // Ensure we don't send 'role' (singular) to WP API, it expects 'roles' (array)
+          if (wpBody.role) {
+              delete wpBody.role;
+          }
+          // Ensure roles is an array
+          if (newUser.roles && Array.isArray(newUser.roles)) {
+              wpBody.roles = newUser.roles;
+          } else if (newUser.role) {
+              wpBody.roles = [newUser.role];
+          }
+
+          // Convert meta_data array to meta object for WP API
+          if (metaData && metaData.length > 0) {
+              wpBody.meta = {};
+              metaData.forEach(m => {
+                  wpBody.meta[m.key] = m.value;
+              });
+          }
+          
+          console.log('Creating user via WP API:', wpBody);
+
           const response = await fetch(`${baseUrl}/wp-json/wp/v2/users`, {
               method: 'POST',
               headers: { 
                   'Authorization': `Bearer ${currentUser.token}`,
                   'Content-Type': 'application/json'
               },
-              body: JSON.stringify(newUser)
+              body: JSON.stringify(wpBody)
           });
 
           if (!response.ok) {
               const err = await response.json();
+              console.error('WP API Create User Error:', err);
               throw new Error(err.message || 'خطا در ایجاد کاربر');
           }
+          
+          const createdUser = await response.json();
+          console.log('User created successfully:', createdUser);
       }
       localStorage.removeItem(CACHE_KEY_USERS);
       localStorage.removeItem(CACHE_KEY_CUSTOMERS);
